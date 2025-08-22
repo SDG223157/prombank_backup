@@ -2326,6 +2326,62 @@ async def get_all_articles_admin(current_user: User = Depends(require_auth), db:
         logger.error(f"Error getting articles: {e}")
         raise HTTPException(status_code=500, detail="Failed to get articles")
 
+@app.post("/api/admin/execute-sql")
+async def execute_sql_admin(request: Request, current_user: User = Depends(require_auth), db: Session = Depends(get_db)):
+    """Execute SQL query (admin only)"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        data = await request.json()
+        query = data.get('query', '').strip()
+        
+        if not query:
+            raise HTTPException(status_code=400, detail="SQL query is required")
+        
+        # Security check - only allow SELECT, SHOW, DESCRIBE queries for safety
+        allowed_commands = ['SELECT', 'SHOW', 'DESCRIBE', 'EXPLAIN']
+        if not any(query.upper().startswith(cmd) for cmd in allowed_commands):
+            raise HTTPException(status_code=400, detail="Only SELECT, SHOW, DESCRIBE, and EXPLAIN queries are allowed for safety")
+        
+        logger.info(f"Admin {current_user.email} executing SQL: {query[:100]}...")
+        
+        result = db.execute(text(query))
+        
+        # Get column names
+        columns = list(result.keys()) if hasattr(result, 'keys') else []
+        
+        # Fetch all results
+        rows = result.fetchall()
+        
+        # Convert to list of dictionaries for JSON response
+        data_rows = []
+        for row in rows:
+            if hasattr(row, '_asdict'):
+                data_rows.append(dict(row._asdict()))
+            else:
+                # Convert tuple to dict with column names
+                row_dict = {}
+                for i, col in enumerate(columns):
+                    row_dict[col] = row[i] if i < len(row) else None
+                data_rows.append(row_dict)
+        
+        logger.info(f"✅ SQL executed successfully. {len(rows)} rows returned.")
+        
+        return {
+            "success": True,
+            "query": query,
+            "columns": columns,
+            "rows": data_rows,
+            "row_count": len(rows),
+            "executed_by": current_user.email,
+            "message": f"Query executed successfully. {len(rows)} rows returned."
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ SQL execution error: {e}")
+        raise HTTPException(status_code=500, detail=f"SQL execution failed: {str(e)}")
+
 @app.post("/api/admin/create-admin-user")
 async def create_admin_user_endpoint(request: Request, db: Session = Depends(get_db)):
     """Create admin user with email and password - one-time setup endpoint"""
