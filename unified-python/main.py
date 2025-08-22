@@ -2382,6 +2382,127 @@ async def execute_sql_admin(request: Request, current_user: User = Depends(requi
         logger.error(f"❌ SQL execution error: {e}")
         raise HTTPException(status_code=500, detail=f"SQL execution failed: {str(e)}")
 
+@app.get("/api/admin/database/space-analysis")
+async def get_database_space_analysis(current_user: User = Depends(require_auth), db: Session = Depends(get_db)):
+    """Get comprehensive database space analysis (admin only)"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        # Database schema space usage
+        schema_query = '''SELECT table_schema AS database_name, 
+                         ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS size_mb 
+                         FROM information_schema.TABLES 
+                         GROUP BY table_schema 
+                         ORDER BY SUM(data_length + index_length) DESC;'''
+        
+        schema_result = db.execute(text(schema_query))
+        schema_data = []
+        total_size = 0
+        
+        for row in schema_result:
+            size_mb = float(row[1]) if row[1] is not None else 0
+            total_size += size_mb
+            schema_data.append({
+                "database": row[0],
+                "size_mb": size_mb
+            })
+        
+        # Table space usage within your database
+        table_query = '''SELECT table_name, 
+                        ROUND(((data_length + index_length) / 1024 / 1024), 2) AS size_mb,
+                        table_rows
+                        FROM information_schema.tables 
+                        WHERE table_schema = DATABASE() 
+                        ORDER BY (data_length + index_length) DESC;'''
+        
+        table_result = db.execute(text(table_query))
+        table_data = []
+        
+        for row in table_result:
+            table_data.append({
+                "table_name": row[0],
+                "size_mb": float(row[1]) if row[1] is not None else 0,
+                "row_count": int(row[2]) if row[2] is not None else 0
+            })
+        
+        # Record counts
+        counts_query = '''SELECT 
+                         (SELECT COUNT(*) FROM users) as users,
+                         (SELECT COUNT(*) FROM prompts) as prompts,
+                         (SELECT COUNT(*) FROM articles) as articles,
+                         (SELECT COUNT(*) FROM tokens) as tokens;'''
+        
+        counts_result = db.execute(text(counts_query))
+        counts_row = counts_result.fetchone()
+        
+        record_counts = {
+            "users": int(counts_row[0]) if counts_row[0] is not None else 0,
+            "prompts": int(counts_row[1]) if counts_row[1] is not None else 0,
+            "articles": int(counts_row[2]) if counts_row[2] is not None else 0,
+            "tokens": int(counts_row[3]) if counts_row[3] is not None else 0
+        }
+        
+        return {
+            "success": True,
+            "total_size_mb": round(total_size, 2),
+            "database_schemas": schema_data,
+            "table_usage": table_data,
+            "record_counts": record_counts,
+            "analysis_timestamp": datetime.utcnow().isoformat(),
+            "analyzed_by": current_user.email
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Database space analysis error: {e}")
+        raise HTTPException(status_code=500, detail=f"Space analysis failed: {str(e)}")
+
+@app.get("/api/admin/database/tables-info")
+async def get_tables_info(current_user: User = Depends(require_auth), db: Session = Depends(get_db)):
+    """Get detailed table information (admin only)"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        # Get table information
+        tables_query = '''SELECT 
+                         table_name,
+                         table_rows,
+                         ROUND(((data_length + index_length) / 1024 / 1024), 2) AS size_mb,
+                         ROUND((data_length / 1024 / 1024), 2) AS data_mb,
+                         ROUND((index_length / 1024 / 1024), 2) AS index_mb,
+                         engine,
+                         table_collation
+                         FROM information_schema.tables 
+                         WHERE table_schema = DATABASE() 
+                         ORDER BY (data_length + index_length) DESC;'''
+        
+        result = db.execute(text(tables_query))
+        tables_info = []
+        
+        for row in result:
+            tables_info.append({
+                "table_name": row[0],
+                "row_count": int(row[1]) if row[1] is not None else 0,
+                "total_size_mb": float(row[2]) if row[2] is not None else 0,
+                "data_size_mb": float(row[3]) if row[3] is not None else 0,
+                "index_size_mb": float(row[4]) if row[4] is not None else 0,
+                "engine": row[5],
+                "collation": row[6]
+            })
+        
+        return {
+            "success": True,
+            "tables": tables_info,
+            "total_tables": len(tables_info),
+            "analyzed_by": current_user.email,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Tables info error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get tables info: {str(e)}")
+
 @app.post("/api/admin/create-admin-user")
 async def create_admin_user_endpoint(request: Request, db: Session = Depends(get_db)):
     """Create admin user with email and password - one-time setup endpoint"""
