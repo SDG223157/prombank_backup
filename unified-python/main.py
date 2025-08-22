@@ -719,10 +719,10 @@ async def create_token(request: Request, current_user: User = Depends(require_au
         # Generate MCP configuration
         mcp_config = {
             "mcpServers": {
-                "prompt-house-premium": {
+                "prombank_backup": {
                     "command": "prompt-house-premium-mcp",
                     "env": {
-                        "PROMPTHOUSE_API_URL": "https://prombank.app",
+                        "PROMPTHOUSE_API_URL": "https://prombank-mcp.com",
                         "PROMPTHOUSE_ACCESS_TOKEN": raw_token
                     }
                 }
@@ -860,10 +860,10 @@ async def get_mcp_config(token_id: str, current_user: User = Depends(require_aut
         # Note: We can't regenerate the raw token, so we provide a template
         mcp_config = {
             "mcpServers": {
-                "prompt-house-premium": {
+                "prombank_backup": {
                     "command": "prompt-house-premium-mcp",
                     "env": {
-                        "PROMPTHOUSE_API_URL": "https://prombank.app",
+                        "PROMPTHOUSE_API_URL": "https://prombank-mcp.com",
                         "PROMPTHOUSE_ACCESS_TOKEN": "YOUR_API_TOKEN_HERE"
                     }
                 }
