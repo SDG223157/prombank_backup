@@ -15,83 +15,8 @@ class DarkTableProcessor:
         self.css_template = self._get_dark_table_css()
     
     def _get_dark_table_css(self) -> str:
-        """Return the dark table CSS template"""
-        return """
-<style>
-/* Fix spacing between headers and tables */
-h3 + table, h4 + table, h5 + table, h6 + table {
-    margin-top: 5px !important;
-}
-
-p + table, div + table {
-    margin-top: 5px !important;
-}
-
-.dark-table {
-    background-color: #2c3e50;
-    color: #ecf0f1;
-    border-collapse: collapse;
-    width: 100%;
-    margin: 0;
-    margin-top: 5px;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.dark-table th {
-    background-color: #34495e;
-    color: #ecf0f1;
-    padding: 12px 15px;
-    text-align: center;
-    font-weight: bold;
-    border-bottom: 2px solid #1abc9c;
-}
-
-.dark-table td {
-    padding: 10px 15px;
-    text-align: center;
-    border-bottom: 1px solid #34495e;
-}
-
-.dark-table tr:nth-child(even) {
-    background-color: #34495e;
-}
-
-.dark-table tr:hover {
-    background-color: #3498db;
-    transition: background-color 0.3s ease;
-}
-
-.dark-table .row-header {
-    background-color: #34495e;
-    font-weight: bold;
-    text-align: left;
-}
-
-.table-container {
-    background-color: #2c3e50;
-    padding: 15px;
-    border-radius: 8px;
-    margin: 10px 0;
-}
-
-.table-title {
-    color: #ecf0f1;
-    font-weight: bold;
-    margin-bottom: 8px;
-    text-align: center;
-}
-
-.table-note {
-    color: #bdc3c7;
-    font-style: italic;
-    text-align: center;
-    margin-top: 8px;
-    font-size: 0.9em;
-}
-</style>
-"""
+        """Return empty CSS for MCP articles - use clean markdown instead"""
+        return ""
     
     def extract_tables_from_markdown(self, markdown_content: str) -> List[Dict[str, Any]]:
         """Extract table information from markdown content"""
@@ -129,86 +54,64 @@ p + table, div + table {
         
         return tables
     
-    def convert_table_to_html(self, table: Dict[str, Any], table_id: str = None) -> str:
-        """Convert a single table to dark-styled HTML"""
-        html_parts = []
+    def convert_table_to_markdown(self, table: Dict[str, Any]) -> str:
+        """Convert a table back to clean markdown format"""
+        markdown_parts = []
         
-        # Add container if there's a title or note
-        if table['title'] or table['note']:
-            html_parts.append('<div class="table-container">')
-            
-            if table['title']:
-                html_parts.append(f'<div class="table-title">{table["title"]}</div>')
+        # Add title if exists
+        if table['title']:
+            markdown_parts.append(f"**{table['title']}**")
+            markdown_parts.append("")
         
-        # Start table
-        table_class = f'class="dark-table"'
-        if table_id:
-            table_class = f'class="dark-table" id="{table_id}"'
-        
-        html_parts.append(f'<table {table_class}>')
-        
-        # Add header
+        # Create header row
         if table['headers']:
-            html_parts.append('<thead>')
-            html_parts.append('<tr>')
-            for header in table['headers']:
-                html_parts.append(f'<th>{header}</th>')
-            html_parts.append('</tr>')
-            html_parts.append('</thead>')
+            header_row = "| " + " | ".join(table['headers']) + " |"
+            separator_row = "|" + "|".join(["---" for _ in table['headers']]) + "|"
+            markdown_parts.append(header_row)
+            markdown_parts.append(separator_row)
         
-        # Add body
+        # Add data rows
         if table['rows']:
-            html_parts.append('<tbody>')
-            for i, row in enumerate(table['rows']):
-                html_parts.append('<tr>')
-                for j, cell in enumerate(row):
-                    # Check if first column should be a row header (contains **text**)
-                    if j == 0 and cell.startswith('**') and cell.endswith('**'):
-                        cell_content = cell.replace('**', '')
-                        html_parts.append(f'<td class="row-header"><strong>{cell_content}</strong></td>')
-                    else:
-                        # Handle bold text within cells
-                        cell_content = cell.replace('**', '<strong>').replace('**', '</strong>')
-                        html_parts.append(f'<td>{cell_content}</td>')
-                html_parts.append('</tr>')
-            html_parts.append('</tbody>')
-        
-        html_parts.append('</table>')
+            for row in table['rows']:
+                # Clean up cell content
+                cleaned_row = []
+                for cell in row:
+                    # Keep bold formatting but clean up
+                    cleaned_cell = cell.strip()
+                    cleaned_row.append(cleaned_cell)
+                
+                row_string = "| " + " | ".join(cleaned_row) + " |"
+                markdown_parts.append(row_string)
         
         # Add note if exists
         if table['note']:
-            html_parts.append(f'<div class="table-note">{table["note"]}</div>')
+            markdown_parts.append("")
+            markdown_parts.append(f"*{table['note']}*")
         
-        # Close container if opened
-        if table['title'] or table['note']:
-            html_parts.append('</div>')
-        
-        return '\n'.join(html_parts)
+        return '\n'.join(markdown_parts)
     
     def process_markdown_content(self, markdown_content: str) -> str:
-        """Process entire markdown content and convert tables to styled HTML"""
-        # Extract tables
-        tables = self.extract_tables_from_markdown(markdown_content)
+        """Process entire markdown content - keep clean markdown for MCP articles"""
+        # For MCP articles, just return clean markdown without CSS
+        # The platform will handle table rendering
+        return self._clean_markdown_spacing(markdown_content)
+    
+    def _clean_markdown_spacing(self, content: str) -> str:
+        """Clean up markdown spacing issues"""
         
-        if not tables:
-            return markdown_content
+        # Remove excessive blank lines before tables
+        patterns = [
+            (r'(\*\*[^*]+:\*\*)\s*\n\n\n+(\|)', r'\1\n\n\2'),  # Bold headers before tables
+            (r'(### [^#\n]+)\s*\n\n\n+(\|)', r'\1\n\n\2'),     # H3 headers before tables  
+            (r'(#### [^#\n]+)\s*\n\n\n+(\|)', r'\1\n\n\2'),    # H4 headers before tables
+            (r'\n\n\n+(\|)', r'\n\n\1'),                        # General excessive spacing before tables
+            (r'(\|[^\n]+\|)\n\n\n+(\|)', r'\1\n\2'),            # Between table rows
+        ]
         
-        # Start with CSS
-        processed_content = markdown_content
+        for pattern, replacement in patterns:
+            content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
         
-        # Replace each table with styled HTML
-        for i, table in enumerate(tables):
-            table_html = self.convert_table_to_html(table, f"table-{i}")
-            processed_content = processed_content.replace(table['original'], table_html)
-        
-        # Fix spacing issues between headers and tables
-        processed_content = self._fix_header_table_spacing(processed_content)
-        
-        # Add CSS at the beginning if we have tables
-        if tables:
-            processed_content = self.css_template + '\n\n' + processed_content
-        
-        return processed_content
+        return content
     
     def _fix_header_table_spacing(self, content: str) -> str:
         """Fix spacing between markdown headers/text and tables"""
