@@ -38,9 +38,6 @@
                 
                 <!-- Action Buttons -->
                 <div class="flex space-x-3">
-                    <button @click="copyToClipboard(prompt.content)" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition">
-                        <i class="fas fa-copy mr-2"></i>Copy
-                    </button>
                     <button @click="editPrompt()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
                         <i class="fas fa-edit mr-2"></i>Edit
                     </button>
@@ -123,15 +120,6 @@ function viewPromptData() {
             return new Date(dateString).toLocaleDateString();
         },
 
-        async copyToClipboard(text) {
-            try {
-                await navigator.clipboard.writeText(text);
-                this.showMessage('Prompt copied to clipboard!', 'success');
-            } catch (error) {
-                console.error('Failed to copy:', error);
-                this.showMessage('Failed to copy to clipboard', 'error');
-            }
-        },
 
         editPrompt() {
             if (this.prompt) {

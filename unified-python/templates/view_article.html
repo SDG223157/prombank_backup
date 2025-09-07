@@ -87,7 +87,7 @@
             <div class="p-6 border-b border-gray-200">
                 <div class="flex items-center justify-between">
                     <h2 class="text-lg font-semibold text-gray-900">Content</h2>
-                    <div class="flex space-x-2">
+                    <div class="flex space-x-2 items-center">
                         <button @click="viewMode = 'rendered'" 
                                 :class="viewMode === 'rendered' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'"
                                 class="px-3 py-1 rounded text-sm transition">
@@ -98,10 +98,9 @@
                                 class="px-3 py-1 rounded text-sm transition">
                             <i class="fas fa-code mr-1"></i>Markdown
                         </button>
-                        <button @click="copyContent()" 
-                                class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-300 transition">
-                            <i class="fas fa-copy mr-1"></i>Copy
-                        </button>
+                        <span class="text-xs text-gray-500 ml-2">
+                            <i class="fas fa-info-circle mr-1"></i>To copy: Select all (Ctrl+A) then copy (Ctrl+C)
+                        </span>
                     </div>
                 </div>
             </div>
@@ -187,23 +186,6 @@ function viewArticleData(articleId) {
             }
         },
         
-        copyContent() {
-            navigator.clipboard.writeText(this.article.content).then(() => {
-                // Show temporary success message
-                const button = event.target.closest('button');
-                const originalText = button.innerHTML;
-                button.innerHTML = '<i class="fas fa-check mr-1"></i>Copied!';
-                button.classList.add('bg-green-200', 'text-green-700');
-                
-                setTimeout(() => {
-                    button.innerHTML = originalText;
-                    button.classList.remove('bg-green-200', 'text-green-700');
-                }, 2000);
-            }).catch(err => {
-                console.error('Failed to copy content:', err);
-                alert('Failed to copy content to clipboard');
-            });
-        },
         
         renderMarkdown(content) {
             if (!content) return '';
