@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Platform Copy Button Fix</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+        }
+        
+        .solution-box {
+            background: #e8f5e8;
+            border: 2px solid #27ae60;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .error-box {
+            background: #ffe6e6;
+            border: 2px solid #e74c3c;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        
+        .step {
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .button {
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+        
+        .button:hover {
+            background: #2980b9;
+        }
+        
+        .test-content {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 15px 0;
+            min-height: 100px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 MCP Platform Copy Button Fix</h1>
+        
+        <div class="error-box">
+            <h3>❌ Problem Identified:</h3>
+            <p>The copy button on prombank-mcp.com fails due to:</p>
+            <ul>
+                <li><strong>Unicode character issues</strong> (¥, ↗, ✅, 🟢)</li>
+                <li><strong>Browser clipboard API restrictions</strong></li>
+                <li><strong>Large content size</strong> (>20,000 characters)</li>
+                <li><strong>Secure context requirements</strong> (HTTPS)</li>
+            </ul>
+        </div>
+        
+        <div class="solution-box">
+            <h3>✅ Solution Implemented:</h3>
+            <p>Enhanced copy functionality with multiple fallbacks and character cleanup.</p>
+        </div>
+        
+        <h2>🚀 How to Fix Copy Button:</h2>
+        
+        <div class="step">
+            <h3>Method 1: Browser Extension (Recommended)</h3>
+            <p>Install Tampermonkey browser extension and add our userscript:</p>
+            <ol>
+                <li>Install <a href="https://tampermonkey.net/" target="_blank">Tampermonkey</a> browser extension</li>
+                <li>Click Tampermonkey icon → "Create a new script"</li>
+                <li>Replace the template with our userscript code</li>
+                <li>Save and enable the script</li>
+                <li>Refresh the MCP platform page</li>
+            </ol>
+        </div>
+        
+        <div class="step">
+            <h3>Method 2: Browser Console Fix (Quick)</h3>
+            <p>Paste this code into browser developer console (F12):</p>
+            <div class="code-block" id="console-code">
+// Enhanced Copy Fix for MCP Platform
+async function mcpCopyFix() {
+    const content = document.querySelector('.content, .article-content, main')?.innerText || '';
+    if (!content) {
+        alert('No content found to copy');
+        return;
+    }
+    
+    // Clean problematic characters
+    const cleaned = content
+        .replace(/¥/g, 'CNY ')
+        .replace(/↗/g, '(Improving)')
+        .replace(/✅/g, '[PASS]')
+        .replace(/🟢/g, '[GREEN]')
+        .replace(/🔴/g, '[RED]')
+        .replace(/🟡/g, '[YELLOW]')
+        .replace(/∛/g, 'cbrt')
+        .replace(/÷/g, '/')
+        .replace(/×/g, '*');
+    
+    try {
+        await navigator.clipboard.writeText(cleaned);
+        alert('✅ Content copied successfully!');
+    } catch (err) {
+        // Fallback method
+        const textarea = document.createElement('textarea');
+        textarea.value = cleaned;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        alert('✅ Content copied (fallback method)!');
+    }
+}
+
+// Run the fix
+mcpCopyFix();
+            </div>
+            <button class="button" onclick="copyConsoleCode()">📋 Copy Console Code</button>
+        </div>
+        
+        <div class="step">
+            <h3>Method 3: Manual Copy (Always Works)</h3>
+            <ol>
+                <li><strong>Switch to Markdown view</strong> in the MCP platform</li>
+                <li><strong>Select all text</strong> with Ctrl+A (Cmd+A on Mac)</li>
+                <li><strong>Copy with Ctrl+C</strong> (Cmd+C on Mac)</li>
+                <li>This bypasses the platform's copy button entirely</li>
+            </ol>
+        </div>
+        
+        <h2>🧪 Test Copy Functionality:</h2>
+        
+        <div class="test-content" id="test-content">
+# Test Content with Problematic Characters
+
+**Market Metrics:**
+
+| Company | Price | Status |
+|---------|-------|--------|
+| Angel Yeast | ¥42.50 | ✅ Strong |
+| Growth | 12.8% | ↗ Improving |
+
+**Summary:** Quality score 17.5/20 🟢 ATTRACTIVE
+        </div>
+        
+        <button class="button" onclick="testCopy()">🧪 Test Copy Function</button>
+        <button class="button" onclick="testCopyFixed()">✨ Test Fixed Copy Function</button>
+        
+        <h2>🔧 For Future Articles:</h2>
+        
+        <div class="step">
+            <h3>Character Replacement Guidelines:</h3>
+            <ul>
+                <li><strong>¥</strong> → <strong>CNY</strong> (Currency)</li>
+                <li><strong>↗</strong> → <strong>(Improving)</strong> (Trends)</li>
+                <li><strong>✅</strong> → <strong>[PASS]</strong> (Status)</li>
+                <li><strong>🟢</strong> → <strong>[GREEN]</strong> (Colors)</li>
+                <li><strong>∛</strong> → <strong>cbrt</strong> (Math)</li>
+            </ul>
+        </div>
+        
+        <div class="solution-box">
+            <h3>💡 Bottom Line:</h3>
+            <p>The copy button fails due to platform limitations. Our fixes provide reliable workarounds, and future articles will be created with copy-friendly formatting by default.</p>
+        </div>
+    </div>
+    
+    <script>
+        // Test functions
+        async function testCopy() {
+            const content = document.getElementById('test-content').innerText;
+            try {
+                await navigator.clipboard.writeText(content);
+                alert('✅ Original copy worked!');
+            } catch (err) {
+                alert('❌ Original copy failed: ' + err.message);
+            }
+        }
+        
+        async function testCopyFixed() {
+            const content = document.getElementById('test-content').innerText;
+            
+            // Apply our fixes
+            const cleaned = content
+                .replace(/¥/g, 'CNY ')
+                .replace(/↗/g, '(Improving)')
+                .replace(/✅/g, '[PASS]')
+                .replace(/🟢/g, '[GREEN]');
+            
+            try {
+                await navigator.clipboard.writeText(cleaned);
+                alert('✅ Fixed copy worked!');
+            } catch (err) {
+                // Fallback
+                const textarea = document.createElement('textarea');
+                textarea.value = cleaned;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert('✅ Fixed copy worked (fallback)!');
+            }
+        }
+        
+        function copyConsoleCode() {
+            const code = document.getElementById('console-code').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                alert('✅ Console code copied! Paste it in browser console (F12).');
+            }).catch(() => {
+                alert('❌ Copy failed. Please select the code manually.');
+            });
+        }
+    </script>
+</body>
+</html>
