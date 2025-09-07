@@ -13,6 +13,8 @@ A comprehensive system for creating and managing articles with automatic table s
 
 ### 🔧 Enhanced Article Creation
 - **Auto-Detection**: Automatically detects titles, categories, and tags from content
+- **Real-Time Data**: Yahoo Finance integration for accurate stock prices and metrics
+- **Automatic Dating**: Always uses current date for analysis date and calculates review dates
 - **Batch Processing**: Process multiple markdown files at once
 - **File Validation**: Validate markdown files before processing
 - **MCP Integration**: Seamless integration with MCP prombank backup system
@@ -126,14 +128,19 @@ Creates a containerized table with title and notes.
 
 ```
 unified-python/
-├── table_processor.py          # Core table processing logic
-├── article_creator.py          # Enhanced article creation
-├── mcp_article_integration.py  # MCP integration layer
+├── table_processor.py                    # Core table processing logic
+├── article_creator.py                    # Enhanced article creation
+├── enhanced_stock_article_creator.py     # Stock analysis with real-time data
+├── yahoo_finance_integration.py          # Yahoo Finance API integration
+├── date_utils.py                         # Automatic date handling utilities
+├── mcp_article_integration.py            # MCP integration layer
+├── copy_fix_processor.py                 # Copy functionality fixes
 ├── templates/
-│   └── dark_table_styles.css   # CSS template for tables
-├── main.py                     # Flask web application
-├── database.py                 # Database models
-└── requirements.txt            # Python dependencies
+│   ├── dark_table_styles.css             # CSS template for tables
+│   └── view_article.html                 # Article view template (copy button removed)
+├── main.py                               # Flask web application
+├── database.py                           # Database models
+└── requirements.txt                      # Python dependencies
 ```
 
 ## 🔧 Configuration

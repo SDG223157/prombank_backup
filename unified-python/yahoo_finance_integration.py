@@ -6,7 +6,7 @@ Provides accurate, real-time stock data for article creation
 
 import yfinance as yf
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, date
 
 class YahooFinanceIntegration:
     """Integration with Yahoo Finance for real-time stock data"""
@@ -120,6 +120,38 @@ class YahooFinanceIntegration:
                 return f"CNY {value:,.2f}"
         
         return f"{value:,.2f} {currency}"
+    
+    def get_current_analysis_date(self) -> str:
+        """Get current date formatted for analysis"""
+        return datetime.now().strftime("%B %d, %Y")
+    
+    def get_current_date_iso(self) -> str:
+        """Get current date in ISO format"""
+        return datetime.now().strftime("%Y-%m-%d")
+    
+    def get_next_review_date(self, months_ahead: int = 6) -> str:
+        """Get next review date (default 6 months from today)"""
+        try:
+            from dateutil.relativedelta import relativedelta
+            next_date = datetime.now() + relativedelta(months=months_ahead)
+            return next_date.strftime("%B %d, %Y")
+        except ImportError:
+            # Fallback if dateutil not available
+            import calendar
+            today = datetime.now()
+            year = today.year
+            month = today.month + months_ahead
+            
+            # Handle year rollover
+            while month > 12:
+                month -= 12
+                year += 1
+            
+            # Handle month with fewer days
+            day = min(today.day, calendar.monthrange(year, month)[1])
+            
+            next_date = datetime(year, month, day)
+            return next_date.strftime("%B %d, %Y")
     
     def validate_data_freshness(self, data: Dict[str, Any], max_age_hours: int = 24) -> bool:
         """Validate if data is fresh enough"""

@@ -7,6 +7,7 @@ Integrates with MCP prombank backup to create articles with professional dark ta
 import os
 import re
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 from table_processor import DarkTableProcessor, process_file_to_article
 
 class EnhancedArticleCreator:
@@ -259,6 +260,34 @@ class EnhancedArticleCreator:
             summary_parts.append(f"Tags: {', '.join(article_data['tags'][:5])}")
         
         return "\n".join(summary_parts)
+    
+    def get_current_analysis_date(self) -> str:
+        """Get current date formatted for analysis"""
+        return datetime.now().strftime("%B %d, %Y")
+    
+    def get_next_review_date(self, months_ahead: int = 6) -> str:
+        """Get next review date (default 6 months from today)"""
+        try:
+            from dateutil.relativedelta import relativedelta
+            next_date = datetime.now() + relativedelta(months=months_ahead)
+            return next_date.strftime("%B %d, %Y")
+        except ImportError:
+            # Fallback if dateutil not available
+            import calendar
+            today = datetime.now()
+            year = today.year
+            month = today.month + months_ahead
+            
+            # Handle year rollover
+            while month > 12:
+                month -= 12
+                year += 1
+            
+            # Handle month with fewer days
+            day = min(today.day, calendar.monthrange(year, month)[1])
+            
+            next_date = datetime(year, month, day)
+            return next_date.strftime("%B %d, %Y")
 
 # Utility functions for easy integration
 def create_article_from_file(file_path: str, **kwargs) -> Dict[str, Any]:
