@@ -1,259 +1,269 @@
-# Prompt House Premium - Unified Deployment
+# PromBank Backup - Enhanced Article Creation System
 
-A comprehensive prompt management platform with advanced features for AI enthusiasts and professionals. This version combines Backend API, Frontend, and MCP Server into a single unified deployment optimized for Coolify.
+A comprehensive system for creating and managing articles with automatic table styling and MCP integration.
 
-## 🏗️ Architecture
+## 🚀 Features
 
+### ✨ Automatic Table Styling
+- **Dark Professional Tables**: Automatically converts markdown tables to beautifully styled HTML tables
+- **Multiple Table Types**: Support for comparison tables, financial data tables, and sensitivity analysis matrices
+- **Responsive Design**: Tables adapt to different screen sizes
+- **Print-Friendly**: Optimized styles for printing
+- **Hover Effects**: Interactive table rows with smooth transitions
+
+### 🔧 Enhanced Article Creation
+- **Auto-Detection**: Automatically detects titles, categories, and tags from content
+- **Batch Processing**: Process multiple markdown files at once
+- **File Validation**: Validate markdown files before processing
+- **MCP Integration**: Seamless integration with MCP prombank backup system
+
+### 📊 Supported Table Styles
+- **Dark Tables**: Professional dark theme with teal accents
+- **Comparison Tables**: Orange-accented tables for comparisons
+- **Financial Tables**: Green-accented tables for financial data
+- **Sensitivity Analysis**: Special containers for analysis matrices
+
+## 🛠️ Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd prombank_backup
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   cd unified-python
+   pip install -r requirements.txt
+   ```
+
+3. **Set up environment**:
+   ```bash
+   # Create .env file with your configuration
+   cp .env.example .env
+   ```
+
+## 📖 Usage
+
+### Basic Article Creation
+
+```python
+from article_creator import EnhancedArticleCreator
+
+creator = EnhancedArticleCreator()
+
+# Create article from markdown file
+article_data = creator.create_article_from_markdown_file(
+    file_path="path/to/your/article.md",
+    category="Investment Analysis",  # Optional - auto-detected
+    tags=["Investment", "Analysis"]   # Optional - auto-detected
+)
+
+print(creator.get_processing_summary(article_data))
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Unified Application                      │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │              Backend API Server                         │ │
-│  │              (Express.js)                              │ │
-│  │                                                         │ │
-│  │  • Serves API endpoints (/api/*)                       │ │
-│  │  • Serves frontend static files                        │ │
-│  │  • Handles authentication (Google OAuth)               │ │
-│  │  • Database operations (Prisma + MySQL)                │ │
-│  │  • Session management                                   │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │              MCP Server (Optional)                      │ │
-│  │              (Model Context Protocol)                   │ │
-│  │                                                         │ │
-│  │  • AI integration for prompt management                 │ │
-│  │  • Tool interface for external AI systems              │ │
-│  │  • Runs alongside main server                           │ │
-│  └─────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+
+### MCP Integration
+
+```python
+from mcp_article_integration import MCPArticleIntegration
+
+integration = MCPArticleIntegration()
+
+# Create MCP article with automatic table styling
+result = integration.create_mcp_article_from_file(
+    file_path="path/to/your/article.md",
+    dry_run=True  # Test without creating
+)
+
+print(f"Success: {result['success']}")
 ```
 
-## ✨ Features
-
-- **Unified Deployment**: Single container with all components
-- **Prompt Management**: Create, edit, and organize AI prompts  
-- **Advanced Editor**: Rich text editor with syntax highlighting
-- **Multi-Format Import**: Import prompts from JSON, CSV, and Markdown files
-- **Team Collaboration**: Share prompts with team members
-- **Search & Filter**: Powerful search capabilities
-- **Google OAuth**: Secure authentication
-- **MCP Integration**: AI tool integration (optional)
-- **Production Ready**: Optimized for Coolify deployment
-
-## 🚀 Quick Deployment
-
-### Coolify Deployment (Recommended)
-
-1. **Set up repository** in Coolify with these files:
-   - `Dockerfile.unified` - Main dockerfile
-   - `docker-compose.unified.yml` - Service configuration
-   - `startup.sh` - Service orchestration
-
-2. **Configure environment variables** (see `UNIFIED_DEPLOYMENT_GUIDE.md`)
-
-3. **Deploy** and access your application!
-
-### Local Development
+### Command Line Interface
 
 ```bash
-# Install all dependencies
-npm run install:all
+# Single file processing
+python mcp_article_integration.py article.md --dry-run
 
-# Start development environment
-npm run dev
+# Batch processing
+python mcp_article_integration.py --batch file1.md file2.md --category="Technology"
 
-# Or start individual services
-npm run dev:backend    # Backend API server
-npm run dev:frontend   # Next.js frontend
-npm run dev:mcp       # MCP server
+# File validation
+python mcp_article_integration.py --validate article.md
 ```
 
-### Local Production Testing
+## 🎨 Table Styling Examples
 
-```bash
-# Build and start unified application
-./deploy-unified.sh build
-./deploy-unified.sh up
-
-# Check status
-./deploy-unified.sh status
-
-# View logs
-./deploy-unified.sh logs
-
-# Stop services  
-./deploy-unified.sh down
+### Basic Dark Table
+```markdown
+| Company | Ticker | PE Ratio |
+|---------|--------|----------|
+| **Apple** | AAPL | 35 |
+| **Microsoft** | MSFT | 36 |
 ```
 
-## 📁 Project Structure
+Automatically converts to a professional dark table with:
+- Dark background (#2c3e50)
+- Light text (#ecf0f1)
+- Hover effects
+- Professional spacing
+- Bold row headers
+
+### Sensitivity Analysis Matrix
+```markdown
+### Two-Factor Sensitivity Analysis
+
+| Growth/Quality | 15.0 | 16.0 | 17.0 |
+|----------------|------|------|------|
+| **8.0%** | 6.2 | 6.7 | 7.2 |
+| **10.0%** | 6.8 | 7.4 | 8.0 |
+
+*Assumes: PE ratio of 30, dividend yield of 1%*
+```
+
+Creates a containerized table with title and notes.
+
+## 📁 File Structure
 
 ```
-prompt-house-premium/
-├── backend/                 # Express.js API server
-│   ├── src/                # Server source code
-│   ├── prisma/             # Database schema & migrations
-│   └── package.json        # Backend dependencies
-├── frontend/               # Next.js React application  
-│   ├── src/                # Frontend source code
-│   └── package.json        # Frontend dependencies
-├── mcp-server/             # MCP server for AI integration
-│   ├── src/                # MCP server source
-│   └── package.json        # MCP dependencies
-├── Dockerfile.unified      # Unified production dockerfile
-├── docker-compose.unified.yml  # Production services
-├── startup.sh              # Service orchestration script
-├── deploy-unified.sh       # Deployment management
-├── coolify-unified.json    # Coolify configuration
-├── package.json            # Root workspace configuration
-└── UNIFIED_DEPLOYMENT_GUIDE.md  # Comprehensive deployment guide
+unified-python/
+├── table_processor.py          # Core table processing logic
+├── article_creator.py          # Enhanced article creation
+├── mcp_article_integration.py  # MCP integration layer
+├── templates/
+│   └── dark_table_styles.css   # CSS template for tables
+├── main.py                     # Flask web application
+├── database.py                 # Database models
+└── requirements.txt            # Python dependencies
 ```
 
 ## 🔧 Configuration
 
-### Required Environment Variables
+### Auto-Detection Settings
 
-```bash
-# Database
-DATABASE_URL=mysql://user:password@host:3306/database
+The system automatically detects:
 
-# Security  
-JWT_SECRET=your-jwt-secret-base64
-SESSION_SECRET=your-session-secret-base64
+- **Categories**: Based on content keywords
+  - Investment Analysis
+  - Technology  
+  - VPS & Networking
+  - Business Strategy
+  - General
 
-# Google OAuth
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=GOCSPX-your-client-secret
-GOOGLE_CALLBACK_URL=https://yourdomain.com/api/auth/google/callback
+- **Tags**: Comprehensive tag detection including:
+  - Financial terms (Investment, Valuation, Stock Analysis)
+  - Technology terms (Python, JavaScript, CSS Styling)
+  - Company names (Apple, NVIDIA, Microsoft, etc.)
+  - Technical terms (VPS, Nginx, Security, etc.)
 
-# Application URLs
-ALLOWED_ORIGINS=https://yourdomain.com
-FRONTEND_URL=https://yourdomain.com  
-BACKEND_URL=https://yourdomain.com
-NEXT_PUBLIC_API_URL=https://yourdomain.com/api
+### CSS Customization
 
-# Optional: MCP Server
-PROMPTHOUSE_ACCESS_TOKEN=your-mcp-token
+Modify `templates/dark_table_styles.css` to customize:
+- Color schemes
+- Spacing and padding
+- Hover effects
+- Responsive breakpoints
+- Print styles
+
+## 🎯 Supported Content Types
+
+### Financial Articles
+- Stock analysis with valuation tables
+- Company comparisons
+- Financial metrics tables
+- Sensitivity analysis matrices
+
+### Technical Articles
+- Code examples with data tables
+- Configuration comparisons
+- Performance metrics
+- Feature comparison matrices
+
+### Tutorial Articles
+- Step-by-step guides with data tables
+- Configuration examples
+- Troubleshooting matrices
+
+## 🚀 Advanced Features
+
+### Batch Processing
+Process multiple files with consistent styling:
+
+```python
+creator = EnhancedArticleCreator()
+articles = creator.batch_process_files([
+    "article1.md",
+    "article2.md", 
+    "article3.md"
+])
 ```
 
-## 📊 Service Endpoints
+### File Validation
+Validate markdown files before processing:
 
-- **Frontend**: `https://yourdomain.com/`
-- **API**: `https://yourdomain.com/api`
-- **Health Check**: `https://yourdomain.com/health`
-- **Authentication**: `https://yourdomain.com/api/auth/google`
+```python
+integration = MCPArticleIntegration()
+result = integration.validate_markdown_file("article.md")
 
-## 📖 Documentation
-
-- **[Unified Deployment Guide](UNIFIED_DEPLOYMENT_GUIDE.md)** - Complete deployment instructions
-- **[Coolify Configuration](coolify-unified.json)** - Platform-specific settings
-- **[Frontend README](frontend/README.md)** - Frontend-specific documentation
-
-## 🛠️ Development Commands
-
-```bash
-# Workspace management
-npm run install:all         # Install all dependencies
-npm run build               # Build all components  
-npm run dev                 # Start all dev servers
-
-# Deployment management
-./deploy-unified.sh build   # Build production image
-./deploy-unified.sh up      # Start services
-./deploy-unified.sh down    # Stop services
-./deploy-unified.sh logs    # View logs
-./deploy-unified.sh status  # Check health
+if result['valid']:
+    print("✅ File is ready for processing")
+else:
+    print("❌ Issues found:", result['issues'])
 ```
 
-## 🔐 Security Features
+### Custom Table Types
+Extend with custom table styles:
 
-- **HTTPS/SSL** required for production
-- **CORS protection** with configurable origins
-- **Rate limiting** on API endpoints
-- **Secure session cookies** with HTTP-only flag
-- **Google OAuth** for authentication
-- **Environment-based secrets** management
-
-## 📈 Production Features
-
-- **Health monitoring** with built-in endpoints
-- **Database migrations** run automatically on startup
-- **Graceful shutdown** handling
-- **Resource optimization** with multi-stage builds
-- **Container orchestration** with proper service dependencies
-- **Backup support** for database and configuration
-
-## 📥 Import Formats
-
-Prompt House Premium supports importing prompts from multiple formats:
-
-### JSON Format
-```json
-{
-  "prompts": [
-    {
-      "title": "Code Assistant",
-      "description": "Helpful coding assistant",
-      "content": "Write a {{language}} function that {{task}}",
-      "category": "Development", 
-      "tags": ["coding", "programming"],
-      "is_public": false
-    }
-  ]
+```python
+# Add custom CSS classes
+custom_css = """
+.custom-table {
+    background-color: #1a1a1a;
+    border: 2px solid #ff6b35;
 }
+"""
+
+processor = DarkTableProcessor()
+processor.css_template += custom_css
 ```
 
-### CSV Format
-```csv
-title,description,content,category,tags,is_public
-"Code Assistant","Helpful coding assistant","Write a {{language}} function that {{task}}","Development","coding,programming",false
-```
+## 🔍 Examples
 
-### Markdown Format (NEW!)
-```markdown
-# Code Assistant
+See the `examples/` directory for:
+- Sample markdown files
+- Generated HTML output
+- CSS customization examples
+- Integration examples
 
-**Description:** Helpful coding assistant
-**Category:** Development
-**Tags:** coding, programming
-**Public:** false
+## 🤝 Contributing
 
-Write a {{language}} function that {{task}}.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
----
+## 📝 License
 
-# Another Prompt
-
-**Description:** Another helpful prompt
-**Tags:** example, demo
-
-Your prompt content here with {{variables}}.
-```
-
-**Markdown Format Features:**
-- Use `#`, `##`, or `###` headers for prompt titles
-- Use `**Field:**` syntax for metadata
-- Separate multiple prompts with `---`
-- Support for `{{variable}}` syntax
-- Defaults to private (`is_public: false`)
-
-See `sample-prompts.md` for a complete example.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🆘 Support
 
-For deployment issues:
+For issues and questions:
+1. Check the documentation
+2. Search existing issues
+3. Create a new issue with detailed information
 
-1. Check the **[Unified Deployment Guide](UNIFIED_DEPLOYMENT_GUIDE.md)**
-2. Verify **environment variables** are set correctly  
-3. Test the **health endpoint**: `/health`
-4. Review **application logs** via Coolify or Docker
-5. Ensure **database connectivity** and migrations
+## 🔄 Version History
 
-## 📄 License
-
-MIT License - see LICENSE file for details
+### v1.0.0 (Current)
+- ✅ Automatic table styling with dark theme
+- ✅ Enhanced article creation with auto-detection
+- ✅ MCP integration layer
+- ✅ Command-line interface
+- ✅ Batch processing support
+- ✅ File validation
+- ✅ Responsive and print-friendly styles
 
 ---
 
-**Ready for production deployment on Coolify with a single unified container! 🚀**
+**Built with ❤️ for creating beautiful, professional articles with stunning table presentations.**
