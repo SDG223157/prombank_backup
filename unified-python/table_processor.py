@@ -18,12 +18,22 @@ class DarkTableProcessor:
         """Return the dark table CSS template"""
         return """
 <style>
+/* Fix spacing between headers and tables */
+h3 + table, h4 + table, h5 + table, h6 + table {
+    margin-top: 5px !important;
+}
+
+p + table, div + table {
+    margin-top: 5px !important;
+}
+
 .dark-table {
     background-color: #2c3e50;
     color: #ecf0f1;
     border-collapse: collapse;
     width: 100%;
-    margin: 8px 0;
+    margin: 0;
+    margin-top: 5px;
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -191,11 +201,33 @@ class DarkTableProcessor:
             table_html = self.convert_table_to_html(table, f"table-{i}")
             processed_content = processed_content.replace(table['original'], table_html)
         
+        # Fix spacing issues between headers and tables
+        processed_content = self._fix_header_table_spacing(processed_content)
+        
         # Add CSS at the beginning if we have tables
         if tables:
             processed_content = self.css_template + '\n\n' + processed_content
         
         return processed_content
+    
+    def _fix_header_table_spacing(self, content: str) -> str:
+        """Fix spacing between markdown headers/text and tables"""
+        
+        # Patterns that often precede tables with too much space
+        patterns = [
+            (r'(\*\*Market Metrics:\*\*)\s*\n\n+(<table)', r'\1\n\n\2'),
+            (r'(\*\*Valuation Ratios:\*\*)\s*\n\n+(<table)', r'\1\n\n\2'),
+            (r'(\*\*Profitability & Returns:\*\*)\s*\n\n+(<table)', r'\1\n\n\2'),
+            (r'(\*\*Financial Health:\*\*)\s*\n\n+(<table)', r'\1\n\n\2'),
+            (r'(\*\*[^*]+:\*\*)\s*\n\n+(<table)', r'\1\n\n\2'),  # Generic bold headers
+            (r'(### [^#\n]+)\s*\n\n+(<table)', r'\1\n\n\2'),  # H3 headers
+            (r'(#### [^#\n]+)\s*\n\n+(<table)', r'\1\n\n\2'),  # H4 headers
+        ]
+        
+        for pattern, replacement in patterns:
+            content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
+        
+        return content
     
     def create_article_with_styled_tables(self, title: str, markdown_content: str, 
                                         category: str = None, tags: List[str] = None) -> Dict[str, Any]:

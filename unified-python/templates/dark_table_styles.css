@@ -1,14 +1,37 @@
 /* Dark Professional Table Styles for Articles */
 /* Author: AI Assistant */
-/* Version: 1.0 */
+/* Version: 1.1 */
 /* Purpose: Professional dark-themed tables for article content */
+
+/* Fix spacing between headers and tables */
+h3 + table, h4 + table, h5 + table, h6 + table {
+    margin-top: 5px !important;
+}
+
+p + table, div + table {
+    margin-top: 5px !important;
+}
+
+/* Reduce spacing after headers that precede tables */
+h3:has(+ table), h4:has(+ table), h5:has(+ table), h6:has(+ table) {
+    margin-bottom: 5px !important;
+}
+
+/* Target specific markdown patterns */
+p:contains("Market Metrics:") + table,
+p:contains("Valuation Ratios:") + table,
+p:contains("Profitability") + table,
+p:contains("Financial Health:") + table {
+    margin-top: 0 !important;
+}
 
 .dark-table {
     background-color: #2c3e50;
     color: #ecf0f1;
     border-collapse: collapse;
     width: 100%;
-    margin: 8px 0;
+    margin: 0;
+    margin-top: 5px;
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -130,7 +153,8 @@
     color: #ecf0f1;
     border-collapse: collapse;
     width: 100%;
-    margin: 8px 0;
+    margin: 0;
+    margin-top: 5px;
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -166,7 +190,8 @@
     color: #ecf0f1;
     border-collapse: collapse;
     width: 100%;
-    margin: 8px 0;
+    margin: 0;
+    margin-top: 5px;
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
