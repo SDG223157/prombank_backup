@@ -381,12 +381,12 @@ async def update_prompt(prompt_id: str, request: Request, db: Session = Depends(
         if not prompt:
             raise HTTPException(status_code=404, detail="Prompt not found")
         
-        # Check authorization: user owns prompt OR (user is admin AND prompt is public)
+        # Check authorization: user owns prompt OR user is admin (admins can update any prompt)
         is_owner = prompt.user_id == current_user.id
-        is_admin_updating_public = current_user.is_admin and prompt.is_public
+        is_admin = current_user.is_admin
         
-        if not is_owner and not is_admin_updating_public:
-            error_message = "Only admins can update public prompts that are not their own" if prompt.is_public else "You can only update your own prompts"
+        if not is_owner and not is_admin:
+            error_message = "You can only update your own prompts"
             raise HTTPException(status_code=403, detail=error_message)
         
         data = await request.json()
@@ -443,12 +443,12 @@ async def delete_prompt(prompt_id: str, request: Request, db: Session = Depends(
         if not prompt:
             raise HTTPException(status_code=404, detail="Prompt not found")
         
-        # Check authorization: user owns prompt OR (user is admin AND prompt is public)
+        # Check authorization: user owns prompt OR user is admin (admins can delete any prompt)
         is_owner = prompt.user_id == current_user.id
-        is_admin_deleting_public = current_user.is_admin and prompt.is_public
+        is_admin = current_user.is_admin
         
-        if not is_owner and not is_admin_deleting_public:
-            error_message = "Only admins can delete public prompts that are not their own" if prompt.is_public else "You can only delete your own prompts"
+        if not is_owner and not is_admin:
+            error_message = "You can only delete your own prompts"
             raise HTTPException(status_code=403, detail=error_message)
         
         db.delete(prompt)

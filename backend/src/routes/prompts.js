@@ -429,16 +429,14 @@ router.put('/:id', authenticateEither, updatePromptValidation, async (req, res) 
       select: { isAdmin: true }
     });
 
-    // Check authorization: user owns prompt OR (user is admin AND prompt is public)
+    // Check authorization: user owns prompt OR user is admin (admins can update any prompt)
     const isOwner = existingPrompt.userId === userId;
-    const isAdminUpdatingPublic = user?.isAdmin && existingPrompt.isPublic;
+    const isAdmin = user?.isAdmin;
 
-    if (!isOwner && !isAdminUpdatingPublic) {
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({
         error: 'Access Denied',
-        message: existingPrompt.isPublic 
-          ? 'Only admins can update public prompts that are not their own'
-          : 'You can only update your own prompts'
+        message: 'You can only update your own prompts'
       });
     }
 

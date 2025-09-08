@@ -574,14 +574,12 @@ class PromptHouseMCPServer {
       select: { isAdmin: true }
     });
 
-    // Check authorization: user owns prompt OR (user is admin AND prompt is public)
+    // Check authorization: user owns prompt OR user is admin (admins can update any prompt)
     const isOwner = existingPrompt.userId === userId;
-    const isAdminUpdatingPublic = user?.isAdmin && existingPrompt.isPublic;
+    const isAdmin = user?.isAdmin;
 
-    if (!isOwner && !isAdminUpdatingPublic) {
-      const errorMessage = existingPrompt.isPublic 
-        ? 'Only admins can update public prompts that are not their own'
-        : 'You can only update your own prompts';
+    if (!isOwner && !isAdmin) {
+      const errorMessage = 'You can only update your own prompts';
       throw new Error(errorMessage);
     }
 
