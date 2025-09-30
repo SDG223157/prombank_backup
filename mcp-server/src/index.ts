@@ -83,6 +83,21 @@ interface ImportRequest {
   format?: 'json' | 'csv' | 'md' | 'auto-detect';
 }
 
+interface ImportArticleData {
+  title: string;
+  content: string;
+  category?: string;
+  tags?: string[];
+  prompt_id?: string;
+  metadata?: any;
+}
+
+interface ImportArticlesRequest {
+  type: 'json' | 'url';
+  articles?: ImportArticleData[];
+  url?: string;
+}
+
 class PromptHousePremiumServer {
   private server: Server;
   private apiUrl: string;
@@ -561,6 +576,44 @@ class PromptHousePremiumServer {
               type: 'object',
               properties: {}
             }
+          },
+          {
+            name: 'import_articles',
+            description: 'Import multiple articles from JSON data or URL',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                type: {
+                  type: 'string',
+                  enum: ['json', 'url'],
+                  description: 'Import type: json (direct data) or url (from remote source)'
+                },
+                articles: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      title: { type: 'string' },
+                      content: { type: 'string' },
+                      category: { type: 'string' },
+                      tags: {
+                        type: 'array',
+                        items: { type: 'string' }
+                      },
+                      prompt_id: { type: 'string' },
+                      metadata: { type: 'object' }
+                    },
+                    required: ['title', 'content']
+                  },
+                  description: 'Array of articles to import (required for json type)'
+                },
+                url: {
+                  type: 'string',
+                  description: 'URL to fetch articles from (required for url type)'
+                }
+              },
+              required: ['type']
+            }
           }
         ]
       };
@@ -618,6 +671,9 @@ class PromptHousePremiumServer {
           
           case 'get_article_stats':
             return await this.handleGetArticleStats(args);
+          
+          case 'import_articles':
+            return await this.handleImportArticles(args);
           
           default:
             throw new Error(`Unknown tool: ${name}`);
@@ -1134,6 +1190,63 @@ class PromptHousePremiumServer {
           {
             type: 'text',
             text: `❌ Failed to get article stats: ${error.response?.data?.message || error.message}`
+          }
+        ]
+      };
+    }
+  }
+
+  private async handleImportArticles(args: any) {
+    const request = args as ImportArticlesRequest;
+    
+    try {
+      if (request.type === 'json') {
+        // Direct JSON import
+        if (!request.articles || request.articles.length === 0) {
+          throw new Error('No articles provided for JSON import');
+        }
+        
+        const data = await this.makeApiCall('/mcp/import-articles', 'POST', {
+          type: 'json',
+          articles: request.articles
+        });
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `✅ **Article Import Successful!**\n\n${data.message}\n\nImported ${request.articles.length} articles via MCP.\n\n**Imported Articles:**\n${data.imported_articles.map((article: any) => `📄 ${article.title} (${article.word_count || 0} words) - ID: ${article.id}`).join('\n')}\n\n---\n\n**Raw Data:**\n${JSON.stringify(data, null, 2)}`
+            }
+          ]
+        };
+      } else if (request.type === 'url') {
+        // URL-based import
+        if (!request.url) {
+          throw new Error('URL is required for URL import');
+        }
+        
+        const data = await this.makeApiCall('/mcp/import-articles', 'POST', {
+          type: 'url',
+          url: request.url
+        });
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `✅ **Article Import from URL Successful!**\n\n${data.message}\n\nSource: ${data.source_url}\n\n**Imported Articles:**\n${data.imported_articles.map((article: any) => `📄 ${article.title} (${article.word_count || 0} words) - ID: ${article.id}`).join('\n')}\n\n---\n\n**Raw Data:**\n${JSON.stringify(data, null, 2)}`
+            }
+          ]
+        };
+      } else {
+        throw new Error(`Unsupported import type: ${request.type}`);
+      }
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ Article import failed: ${error.response?.data?.detail || error.message}`
           }
         ]
       };

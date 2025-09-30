@@ -59,6 +59,17 @@ class UpdateArticleRequest(BaseModel):
     tags: List[str] = None
     metadata: Dict[str, Any] = None
 
+class ImportArticleModel(BaseModel):
+    title: str
+    content: str
+    category: str = "Imported"
+    tags: List[str] = []
+    prompt_id: str = None
+    metadata: Dict[str, Any] = {}
+
+class BulkImportArticlesRequest(BaseModel):
+    articles: List[ImportArticleModel]
+
 def calculate_counts(content: str) -> tuple:
     """Calculate word and character counts for content"""
     char_count = len(content)
@@ -1347,6 +1358,150 @@ async def mcp_import_prompts(request: Request, db: Session = Depends(get_db)):
         logger.error(f"Error in MCP import: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail="MCP import failed")
+
+# MCP Import articles endpoint
+@app.post("/api/mcp/import-articles")
+async def mcp_import_articles(request: Request, db: Session = Depends(get_db)):
+    """MCP endpoint to import articles (requires API token)"""
+    current_user = get_current_user_or_token(request, db)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="API token required")
+    
+    try:
+        data = await request.json()
+        import_type = data.get("type", "json")
+        
+        if import_type == "json":
+            articles_data = data.get("articles", [])
+            imported_articles = []
+            
+            for article_data in articles_data:
+                if not article_data.get('title') or not article_data.get('content'):
+                    continue
+                
+                # Verify prompt exists if prompt_id is provided
+                prompt_title = None
+                if article_data.get('prompt_id'):
+                    if current_user.is_admin:
+                        prompt = db.query(Prompt).filter(Prompt.id == article_data.get('prompt_id')).first()
+                    else:
+                        prompt = db.query(Prompt).filter(
+                            Prompt.id == article_data.get('prompt_id'),
+                            Prompt.user_id == current_user.id
+                        ).first()
+                    
+                    if prompt:
+                        prompt_title = prompt.title
+                
+                # Calculate word and character counts
+                word_count, char_count = calculate_counts(article_data.get('content', ''))
+                
+                new_article = Article(
+                    id=str(uuid.uuid4()),
+                    title=article_data.get('title'),
+                    content=article_data.get('content'),
+                    category=article_data.get('category', 'Imported'),
+                    tags=article_data.get('tags', []),
+                    prompt_id=article_data.get('prompt_id'),
+                    prompt_title=prompt_title,
+                    user_id=current_user.id,
+                    word_count=word_count,
+                    char_count=char_count,
+                    article_metadata=article_data.get('metadata', {}),
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                db.add(new_article)
+                imported_articles.append({
+                    "id": new_article.id,
+                    "title": new_article.title,
+                    "word_count": word_count
+                })
+            
+            db.commit()
+            return {
+                "message": f"Successfully imported {len(imported_articles)} articles via MCP",
+                "imported_articles": imported_articles
+            }
+        
+        elif import_type == "url":
+            # URL-based import for articles
+            url = data.get("url")
+            if not url:
+                raise HTTPException(status_code=400, detail="URL is required for URL import")
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                content = response.text
+            
+            # Try to parse as JSON
+            try:
+                json_data = json.loads(content)
+                articles_data = json_data if isinstance(json_data, list) else json_data.get('articles', [])
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="URL content must be valid JSON")
+            
+            imported_articles = []
+            for article_data in articles_data:
+                if not article_data.get('title') or not article_data.get('content'):
+                    continue
+                
+                # Verify prompt exists if prompt_id is provided
+                prompt_title = None
+                if article_data.get('prompt_id'):
+                    if current_user.is_admin:
+                        prompt = db.query(Prompt).filter(Prompt.id == article_data.get('prompt_id')).first()
+                    else:
+                        prompt = db.query(Prompt).filter(
+                            Prompt.id == article_data.get('prompt_id'),
+                            Prompt.user_id == current_user.id
+                        ).first()
+                    
+                    if prompt:
+                        prompt_title = prompt.title
+                
+                # Calculate word and character counts
+                word_count, char_count = calculate_counts(article_data.get('content', ''))
+                
+                new_article = Article(
+                    id=str(uuid.uuid4()),
+                    title=article_data.get('title'),
+                    content=article_data.get('content'),
+                    category=article_data.get('category', 'Imported'),
+                    tags=article_data.get('tags', []),
+                    prompt_id=article_data.get('prompt_id'),
+                    prompt_title=prompt_title,
+                    user_id=current_user.id,
+                    word_count=word_count,
+                    char_count=char_count,
+                    article_metadata=article_data.get('metadata', {}),
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                db.add(new_article)
+                imported_articles.append({
+                    "id": new_article.id,
+                    "title": new_article.title,
+                    "word_count": word_count
+                })
+            
+            db.commit()
+            return {
+                "message": f"Successfully imported {len(imported_articles)} articles from URL",
+                "source_url": url,
+                "imported_articles": imported_articles
+            }
+        
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported import type for MCP")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in MCP article import: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"MCP article import failed: {str(e)}")
 
 # Article API Routes
 @app.get("/api/articles")
