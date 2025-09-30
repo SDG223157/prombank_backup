@@ -2,9 +2,10 @@
 
 ## Overview
 
-The `import_articles` MCP tool allows you to bulk import articles into prombank_backup using the Model Context Protocol. This tool supports two import methods:
+The `import_articles` MCP tool allows you to bulk import articles into prombank_backup using the Model Context Protocol. This tool supports three import methods:
 1. **JSON Import**: Direct import from JSON data
 2. **URL Import**: Import from a remote JSON URL
+3. **Markdown Import**: Import from Markdown file content
 
 ## Prerequisites
 
@@ -15,15 +16,16 @@ The `import_articles` MCP tool allows you to bulk import articles into prombank_
 ## Tool: `import_articles`
 
 ### Description
-Import multiple articles from JSON data or URL
+Import multiple articles from JSON data, URL, or Markdown content
 
 ### Parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `type` | string (enum: 'json', 'url') | Yes | Import type: json (direct data) or url (from remote source) |
+| `type` | string (enum: 'json', 'url', 'markdown', 'md') | Yes | Import type: json (direct data), url (from remote source), or markdown/md (markdown content) |
 | `articles` | array | Required for json type | Array of article objects to import |
 | `url` | string | Required for url type | URL to fetch articles from |
+| `markdown_content` | string | Required for markdown/md type | Markdown content containing articles |
 
 ### Article Object Format
 
@@ -43,6 +45,48 @@ Each article in the `articles` array must have the following structure:
   }
 }
 ```
+
+### Markdown Format
+
+For markdown imports, articles should follow this structure:
+
+```markdown
+# Article Title
+
+**Category:** Category Name
+**Tags:** tag1, tag2, tag3
+**Prompt ID:** optional-uuid-here
+**Metadata:** author=John Doe, date=2025-09-30
+
+Article content goes here in full markdown format.
+
+You can include:
+- Lists
+- **Bold** and *italic* text
+- Code blocks
+- Links and images
+- Multiple paragraphs
+
+Everything after the metadata section is treated as article content.
+
+---
+
+# Second Article Title
+
+**Category:** Another Category
+**Tags:** tutorial, advanced
+
+Content for the second article...
+```
+
+**Metadata Fields:**
+- `**Category:**` - Article category (optional, defaults to "Imported")
+- `**Tags:**` - Comma-separated list of tags (optional)
+- `**Prompt ID:**` or `**Prompt_ID:**` - UUID of associated prompt (optional)
+- `**Metadata:**` - Key-value pairs in `key=value, key2=value2` format (optional)
+
+**Separator:**
+- Use `---` (three dashes) to separate multiple articles in the same markdown file
 
 ## Usage Examples
 
@@ -116,6 +160,26 @@ The JSON file at the URL should contain an array of articles or an object with a
 }
 ```
 
+### Example 3: Markdown Import
+
+Import articles from markdown content:
+
+```json
+{
+  "type": "markdown",
+  "markdown_content": "# Getting Started with AI\n\n**Category:** AI Tutorial\n**Tags:** AI, Tutorial, Beginner\n**Metadata:** author=AI Expert, difficulty=Beginner\n\n# Introduction\n\nArtificial Intelligence is transforming how we interact with technology...\n\n## Key Concepts\n\n1. Machine Learning\n2. Neural Networks\n3. Natural Language Processing\n\n---\n\n# Advanced Prompt Engineering\n\n**Category:** Prompt Engineering\n**Tags:** Prompts, Advanced, LLM\n**Prompt ID:** abc-123-def-456\n\n# Advanced Techniques\n\nThis article covers advanced prompt engineering techniques...\n\n## Best Practices\n\n- Use clear instructions\n- Provide examples\n- Iterate and refine"
+}
+```
+
+Or with a multiline string (if your tool supports it):
+
+```json
+{
+  "type": "md",
+  "markdown_content": "# Article One\n\n**Category:** Tutorial\n**Tags:** guide, beginner\n\nContent for article one...\n\n---\n\n# Article Two\n\n**Category:** Advanced\n**Tags:** guide, advanced\n\nContent for article two..."
+}
+```
+
 ## Response Format
 
 ### Success Response
@@ -178,6 +242,14 @@ Set up automated imports from remote URLs to sync content from multiple sources.
 
 Export articles to JSON for backup, then restore them using the import tool.
 
+### 5. Import from Markdown Files
+
+If you have articles written in Markdown files, you can directly import them by reading the file content and passing it to the import tool. This is ideal for:
+- Blog posts written in Markdown
+- Documentation files
+- GitHub README files or wikis
+- Any markdown-based content
+
 ## Best Practices
 
 1. **Validate JSON**: Ensure your JSON is valid before attempting import
@@ -222,6 +294,21 @@ POST /api/mcp/import-articles
 ### Error: "Prompt not found or access denied"
 - Verify the `prompt_id` exists
 - Check that you have access to the prompt (for non-admin users)
+
+### Error: "Markdown content is required for markdown import"
+- Ensure you're passing the `markdown_content` parameter
+- Check that the parameter name is correct (use `markdown_content`, not just `content`)
+
+### Error: "Failed to parse markdown"
+- Verify your markdown format follows the expected structure
+- Ensure article titles start with `#` (header syntax)
+- Check that metadata fields use the `**Field:**` format
+- Make sure articles are separated by `---` if multiple articles
+
+### Error: "No valid articles found in markdown content"
+- Verify that each article has both a title (header) and content
+- Check that the markdown structure is correct
+- Ensure there's content after the metadata section
 
 ## Related Tools
 

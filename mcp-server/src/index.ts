@@ -93,9 +93,10 @@ interface ImportArticleData {
 }
 
 interface ImportArticlesRequest {
-  type: 'json' | 'url';
+  type: 'json' | 'url' | 'markdown' | 'md';
   articles?: ImportArticleData[];
   url?: string;
+  markdown_content?: string;
 }
 
 class PromptHousePremiumServer {
@@ -579,14 +580,14 @@ class PromptHousePremiumServer {
           },
           {
             name: 'import_articles',
-            description: 'Import multiple articles from JSON data or URL',
+            description: 'Import multiple articles from JSON data, URL, or Markdown content',
             inputSchema: {
               type: 'object',
               properties: {
                 type: {
                   type: 'string',
-                  enum: ['json', 'url'],
-                  description: 'Import type: json (direct data) or url (from remote source)'
+                  enum: ['json', 'url', 'markdown', 'md'],
+                  description: 'Import type: json (direct data), url (from remote source), or markdown/md (markdown content)'
                 },
                 articles: {
                   type: 'array',
@@ -610,6 +611,10 @@ class PromptHousePremiumServer {
                 url: {
                   type: 'string',
                   description: 'URL to fetch articles from (required for url type)'
+                },
+                markdown_content: {
+                  type: 'string',
+                  description: 'Markdown content containing articles (required for markdown/md type)'
                 }
               },
               required: ['type']
@@ -1235,6 +1240,25 @@ class PromptHousePremiumServer {
             {
               type: 'text',
               text: `✅ **Article Import from URL Successful!**\n\n${data.message}\n\nSource: ${data.source_url}\n\n**Imported Articles:**\n${data.imported_articles.map((article: any) => `📄 ${article.title} (${article.word_count || 0} words) - ID: ${article.id}`).join('\n')}\n\n---\n\n**Raw Data:**\n${JSON.stringify(data, null, 2)}`
+            }
+          ]
+        };
+      } else if (request.type === 'markdown' || request.type === 'md') {
+        // Markdown-based import
+        if (!request.markdown_content) {
+          throw new Error('Markdown content is required for markdown import');
+        }
+        
+        const data = await this.makeApiCall('/mcp/import-articles', 'POST', {
+          type: 'markdown',
+          markdown_content: request.markdown_content
+        });
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `✅ **Article Import from Markdown Successful!**\n\n${data.message}\n\n**Imported Articles:**\n${data.imported_articles.map((article: any) => `📄 ${article.title} (${article.word_count || 0} words) - ID: ${article.id}`).join('\n')}\n\n---\n\n**Raw Data:**\n${JSON.stringify(data, null, 2)}`
             }
           ]
         };

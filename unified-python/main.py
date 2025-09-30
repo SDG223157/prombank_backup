@@ -76,6 +76,104 @@ def calculate_counts(content: str) -> tuple:
     word_count = len(content.strip().split()) if content.strip() else 0
     return word_count, char_count
 
+def parse_markdown_articles(markdown_content: str) -> List[Dict[str, Any]]:
+    """
+    Parse Markdown content to extract articles.
+    
+    Expected format:
+    # Article Title
+    
+    **Category:** Optional category
+    **Tags:** tag1, tag2, tag3
+    **Prompt ID:** optional-prompt-id
+    **Metadata:** key1=value1, key2=value2
+    
+    Article content goes here in markdown format.
+    Can include multiple paragraphs, code blocks, etc.
+    
+    ---
+    
+    # Another Article Title
+    ...
+    """
+    articles = []
+    
+    # Split content by horizontal rules or headers at start of line
+    sections = re.split(r'\n\s*---\s*\n|\n(?=#+\s)', markdown_content.strip())
+    
+    for section in sections:
+        if not section.strip():
+            continue
+            
+        lines = section.strip().split('\n')
+        if not lines:
+            continue
+        
+        # Extract title from first line (should be a header)
+        title_match = re.match(r'^#+\s*(.+)$', lines[0].strip())
+        if not title_match:
+            continue
+            
+        title = title_match.group(1).strip()
+        
+        # Initialize article data
+        article_data = {
+            'title': title,
+            'category': 'Imported',
+            'tags': [],
+            'prompt_id': None,
+            'metadata': {},
+            'content': ''
+        }
+        
+        # Parse metadata and content
+        content_lines = []
+        in_content = False
+        
+        for line in lines[1:]:
+            stripped_line = line.strip()
+            
+            # Check for metadata
+            if stripped_line.startswith('**') and ':' in stripped_line and not in_content:
+                # Extract metadata
+                metadata_match = re.match(r'\*\*([^:]+):\*\*\s*(.+)', stripped_line)
+                if metadata_match:
+                    key = metadata_match.group(1).strip().lower()
+                    value = metadata_match.group(2).strip()
+                    
+                    if key == 'category':
+                        article_data['category'] = value
+                    elif key == 'tags':
+                        # Parse tags (comma-separated)
+                        article_data['tags'] = [tag.strip() for tag in value.split(',') if tag.strip()]
+                    elif key == 'prompt id' or key == 'prompt_id':
+                        article_data['prompt_id'] = value if value else None
+                    elif key == 'metadata':
+                        # Parse metadata (key=value pairs, comma-separated)
+                        try:
+                            metadata_pairs = value.split(',')
+                            for pair in metadata_pairs:
+                                if '=' in pair:
+                                    k, v = pair.split('=', 1)
+                                    article_data['metadata'][k.strip()] = v.strip()
+                        except:
+                            pass
+                    continue
+            
+            # Once we've passed metadata, everything else is content
+            if stripped_line or in_content:
+                in_content = True
+                content_lines.append(line)
+        
+        # Join content lines and clean up
+        article_data['content'] = '\n'.join(content_lines).strip()
+        
+        # Only add articles with content
+        if article_data['content']:
+            articles.append(article_data)
+    
+    return articles
+
 def parse_markdown_prompts(markdown_content: str) -> List[Dict[str, Any]]:
     """
     Parse Markdown content to extract prompts.
@@ -1490,6 +1588,68 @@ async def mcp_import_articles(request: Request, db: Session = Depends(get_db)):
             return {
                 "message": f"Successfully imported {len(imported_articles)} articles from URL",
                 "source_url": url,
+                "imported_articles": imported_articles
+            }
+        
+        elif import_type == "markdown" or import_type == "md":
+            # Markdown import
+            markdown_content = data.get("markdown_content")
+            if not markdown_content:
+                raise HTTPException(status_code=400, detail="Markdown content is required for markdown import")
+            
+            # Parse markdown to extract articles
+            try:
+                articles_data = parse_markdown_articles(markdown_content)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to parse markdown: {str(e)}")
+            
+            if not articles_data:
+                raise HTTPException(status_code=400, detail="No valid articles found in markdown content")
+            
+            imported_articles = []
+            for article_data in articles_data:
+                # Verify prompt exists if prompt_id is provided
+                prompt_title = None
+                if article_data.get('prompt_id'):
+                    if current_user.is_admin:
+                        prompt = db.query(Prompt).filter(Prompt.id == article_data.get('prompt_id')).first()
+                    else:
+                        prompt = db.query(Prompt).filter(
+                            Prompt.id == article_data.get('prompt_id'),
+                            Prompt.user_id == current_user.id
+                        ).first()
+                    
+                    if prompt:
+                        prompt_title = prompt.title
+                
+                # Calculate word and character counts
+                word_count, char_count = calculate_counts(article_data.get('content', ''))
+                
+                new_article = Article(
+                    id=str(uuid.uuid4()),
+                    title=article_data.get('title'),
+                    content=article_data.get('content'),
+                    category=article_data.get('category', 'Imported'),
+                    tags=article_data.get('tags', []),
+                    prompt_id=article_data.get('prompt_id'),
+                    prompt_title=prompt_title,
+                    user_id=current_user.id,
+                    word_count=word_count,
+                    char_count=char_count,
+                    article_metadata=article_data.get('metadata', {}),
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                db.add(new_article)
+                imported_articles.append({
+                    "id": new_article.id,
+                    "title": new_article.title,
+                    "word_count": word_count
+                })
+            
+            db.commit()
+            return {
+                "message": f"Successfully imported {len(imported_articles)} articles from markdown",
                 "imported_articles": imported_articles
             }
         
