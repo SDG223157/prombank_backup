@@ -1597,14 +1597,42 @@ async def mcp_import_articles(request: Request, db: Session = Depends(get_db)):
             if not markdown_content:
                 raise HTTPException(status_code=400, detail="Markdown content is required for markdown import")
             
-            # Parse markdown to extract articles
-            try:
-                articles_data = parse_markdown_articles(markdown_content)
-            except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Failed to parse markdown: {str(e)}")
+            # Check if user wants to split by sections (default: False - import as single article)
+            split_sections = data.get("split_sections", False)
             
-            if not articles_data:
-                raise HTTPException(status_code=400, detail="No valid articles found in markdown content")
+            if split_sections:
+                # Parse markdown to extract multiple articles by sections
+                try:
+                    articles_data = parse_markdown_articles(markdown_content)
+                except Exception as e:
+                    raise HTTPException(status_code=400, detail=f"Failed to parse markdown: {str(e)}")
+                
+                if not articles_data:
+                    raise HTTPException(status_code=400, detail="No valid articles found in markdown content")
+            else:
+                # Import the entire markdown as ONE article
+                # Extract title from first line if it's a header
+                lines = markdown_content.strip().split('\n')
+                title = "Imported Article"
+                content_start = 0
+                
+                if lines and lines[0].startswith('#'):
+                    # Extract title from first header
+                    title = lines[0].lstrip('#').strip()
+                    content_start = 1
+                
+                # Get the full content (everything after the title)
+                full_content = '\n'.join(lines[content_start:]).strip()
+                
+                # Create single article
+                articles_data = [{
+                    'title': title,
+                    'content': full_content,
+                    'category': 'Imported',
+                    'tags': [],
+                    'prompt_id': None,
+                    'metadata': {}
+                }]
             
             imported_articles = []
             for article_data in articles_data:

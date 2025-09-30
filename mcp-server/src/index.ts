@@ -97,6 +97,7 @@ interface ImportArticlesRequest {
   articles?: ImportArticleData[];
   url?: string;
   markdown_content?: string;
+  split_sections?: boolean;
 }
 
 class PromptHousePremiumServer {
@@ -615,6 +616,11 @@ class PromptHousePremiumServer {
                 markdown_content: {
                   type: 'string',
                   description: 'Markdown content containing articles (required for markdown/md type)'
+                },
+                split_sections: {
+                  type: 'boolean',
+                  description: 'Whether to split markdown into multiple articles by headers (default: false - imports as single article)',
+                  default: false
                 }
               },
               required: ['type']
@@ -1249,16 +1255,21 @@ class PromptHousePremiumServer {
           throw new Error('Markdown content is required for markdown import');
         }
         
+        const splitSections = request.split_sections || false;
+        
         const data = await this.makeApiCall('/mcp/import-articles', 'POST', {
           type: 'markdown',
-          markdown_content: request.markdown_content
+          markdown_content: request.markdown_content,
+          split_sections: splitSections
         });
+        
+        const importMode = splitSections ? 'Split into Sections' : 'Single Article';
         
         return {
           content: [
             {
               type: 'text',
-              text: `✅ **Article Import from Markdown Successful!**\n\n${data.message}\n\n**Imported Articles:**\n${data.imported_articles.map((article: any) => `📄 ${article.title} (${article.word_count || 0} words) - ID: ${article.id}`).join('\n')}\n\n---\n\n**Raw Data:**\n${JSON.stringify(data, null, 2)}`
+              text: `✅ **Article Import from Markdown Successful!** (${importMode})\n\n${data.message}\n\n**Imported Articles:**\n${data.imported_articles.map((article: any) => `📄 ${article.title} (${article.word_count || 0} words) - ID: ${article.id}`).join('\n')}\n\n---\n\n**Raw Data:**\n${JSON.stringify(data, null, 2)}`
             }
           ]
         };

@@ -25,7 +25,8 @@ Import multiple articles from JSON data, URL, or Markdown content
 | `type` | string (enum: 'json', 'url', 'markdown', 'md') | Yes | Import type: json (direct data), url (from remote source), or markdown/md (markdown content) |
 | `articles` | array | Required for json type | Array of article objects to import |
 | `url` | string | Required for url type | URL to fetch articles from |
-| `markdown_content` | string | Required for markdown/md type | Markdown content containing articles |
+| `markdown_content` | string | Required for markdown/md type | Markdown content containing article(s) |
+| `split_sections` | boolean | Optional for markdown/md type | Whether to split markdown into multiple articles by headers (default: false - imports as ONE article) |
 
 ### Article Object Format
 
@@ -48,7 +49,9 @@ Each article in the `articles` array must have the following structure:
 
 ### Markdown Format
 
-For markdown imports, articles should follow this structure:
+**IMPORTANT: By default, markdown imports the ENTIRE file as ONE article.**
+
+To import the complete markdown document as a single article (default behavior):
 
 ```markdown
 # Article Title
@@ -85,8 +88,42 @@ Content for the second article...
 - `**Prompt ID:**` or `**Prompt_ID:**` - UUID of associated prompt (optional)
 - `**Metadata:**` - Key-value pairs in `key=value, key2=value2` format (optional)
 
-**Separator:**
+**Separator (only used when split_sections=true):**
 - Use `---` (three dashes) to separate multiple articles in the same markdown file
+
+---
+
+### Splitting Markdown into Multiple Articles
+
+If you want to split a markdown file into multiple articles by sections, set `split_sections: true`:
+
+```markdown
+# First Article
+
+**Category:** Category One
+**Tags:** tag1, tag2
+
+Content for first article...
+
+---
+
+# Second Article
+
+**Category:** Category Two
+**Tags:** tag3, tag4
+
+Content for second article...
+```
+
+**When to use `split_sections: true`:**
+- When you have a markdown file with multiple independent articles
+- When each `---` separator should create a new article
+- When each `###` subsection should become its own article
+
+**When to use default (split_sections: false or omitted):**
+- When importing a single document/article (most common case)
+- When you want the entire markdown file imported as one article
+- When the document is a complete work (like a book chapter, research paper, etc.)
 
 ## Usage Examples
 
@@ -160,25 +197,34 @@ The JSON file at the URL should contain an array of articles or an object with a
 }
 ```
 
-### Example 3: Markdown Import
+### Example 3: Markdown Import (Single Article - Default)
 
-Import articles from markdown content:
+Import the ENTIRE markdown file as ONE article (recommended for most cases):
 
 ```json
 {
   "type": "markdown",
-  "markdown_content": "# Getting Started with AI\n\n**Category:** AI Tutorial\n**Tags:** AI, Tutorial, Beginner\n**Metadata:** author=AI Expert, difficulty=Beginner\n\n# Introduction\n\nArtificial Intelligence is transforming how we interact with technology...\n\n## Key Concepts\n\n1. Machine Learning\n2. Neural Networks\n3. Natural Language Processing\n\n---\n\n# Advanced Prompt Engineering\n\n**Category:** Prompt Engineering\n**Tags:** Prompts, Advanced, LLM\n**Prompt ID:** abc-123-def-456\n\n# Advanced Techniques\n\nThis article covers advanced prompt engineering techniques...\n\n## Best Practices\n\n- Use clear instructions\n- Provide examples\n- Iterate and refine"
+  "markdown_content": "# 解缙草书《唐宋诗文》分篇解读\n\n**总字数：753字（不含标点）**\n\n---\n\n## 第一首：崔珏《有赠》\n\n### 原文\n绿槐夹道集昏鸦，敕使传宣坐赐茶。\n...(full document content)..."
 }
 ```
 
-Or with a multiline string (if your tool supports it):
+This will create ONE article with:
+- **Title**: "解缙草书《唐宋诗文》分篇解读" (extracted from first # header)
+- **Content**: Everything after the title (the entire document)
+
+### Example 4: Markdown Import (Split into Multiple Articles)
+
+If you want to split a markdown file into separate articles, use `split_sections: true`:
 
 ```json
 {
-  "type": "md",
-  "markdown_content": "# Article One\n\n**Category:** Tutorial\n**Tags:** guide, beginner\n\nContent for article one...\n\n---\n\n# Article Two\n\n**Category:** Advanced\n**Tags:** guide, advanced\n\nContent for article two..."
+  "type": "markdown",
+  "markdown_content": "# Getting Started with AI\n\n**Category:** AI Tutorial\n**Tags:** AI, Tutorial, Beginner\n\nArtificial Intelligence is transforming...\n\n---\n\n# Advanced Prompt Engineering\n\n**Category:** Prompt Engineering\n**Tags:** Prompts, Advanced, LLM\n\nThis article covers advanced techniques...",
+  "split_sections": true
 }
 ```
+
+This will create TWO separate articles (split by `---`)
 
 ## Response Format
 
