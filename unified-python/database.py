@@ -2,6 +2,7 @@ import os
 import time
 import logging
 from sqlalchemy import create_engine, text, Column, String, DateTime, Boolean, Integer, Text, JSON, func
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import OperationalError
@@ -47,8 +48,9 @@ class Prompt(Base):
     
     id = Column(String(255), primary_key=True)
     title = Column(String(500), nullable=False)
-    description = Column(Text, nullable=True)
-    content = Column(Text, nullable=False)
+    # MySQL TEXT is ~64KB; templates can exceed this. Use LONGTEXT on MySQL, plain TEXT elsewhere.
+    description = Column(Text().with_variant(LONGTEXT(), "mysql"), nullable=True)
+    content = Column(Text().with_variant(LONGTEXT(), "mysql"), nullable=False)
     tags = Column(JSON, default=list)
     is_public = Column(Boolean, default=False)
     category = Column(String(255), nullable=True)
@@ -85,7 +87,8 @@ class Article(Base):
     
     id = Column(String(255), primary_key=True)
     title = Column(String(500), nullable=False)
-    content = Column(Text, nullable=False)  # LONGTEXT for large markdown content
+    # MySQL TEXT is ~64KB; long markdown articles can exceed this. Use LONGTEXT on MySQL, plain TEXT elsewhere.
+    content = Column(Text().with_variant(LONGTEXT(), "mysql"), nullable=False)
     category = Column(String(255), nullable=True)
     tags = Column(JSON, default=list)
     prompt_id = Column(String(255), nullable=True)  # Optional reference to source prompt
