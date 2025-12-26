@@ -31,19 +31,21 @@ def _fetchone(conn, sql: str, params: dict | None = None):
     return conn.execute(text(sql), params or {}).fetchone()
 
 def _row_get(row, key: str, index: int | None = None):
-    """
-    Robust row accessor across SQLAlchemy versions.
-    - Prefer dict-like `_mapping` when available
-    - Fall back to positional tuple access when needed
+    """Robust row accessor across SQLAlchemy versions / row implementations.
+
+    Prefer tuple positional access when an index is provided.
+    Avoid fragile attribute access (which breaks in some SQLAlchemy configs).
     """
     if row is None:
         return None
+    if index is not None:
+        return row[index]
     mapping = getattr(row, "_mapping", None)
     if mapping is not None and key in mapping:
         return mapping[key]
-    if index is not None:
-        return row[index]
-    return getattr(row, key)
+    if isinstance(row, dict) and key in row:
+        return row[key]
+    raise KeyError(f"Row does not contain key '{key}' and no index was provided.")
 
 
 def main() -> None:
@@ -57,7 +59,7 @@ def main() -> None:
 
     with engine.begin() as conn:
         print("## Column types (information_schema.columns)")
-        # Use .mappings() so rows are dict-like even if default rows are tuple-like
+        # Keep rows positional for maximum compatibility across SQLAlchemy environments.
         rows = conn.execute(
             text(
                 """
@@ -72,23 +74,20 @@ def main() -> None:
                 ORDER BY table_name, column_name
                 """
             )
-        ).mappings().all()
+        ).fetchall()
 
         if not rows:
             print("⚠️  No matching columns found (are tables created in this schema?).")
         else:
             for r in rows:
-                print(
-                    f"- {_row_get(r,'table_name')}.{_row_get(r,'column_name')}: "
-                    f"data_type={_row_get(r,'data_type')}, column_type={_row_get(r,'column_type')}, "
-                    f"nullable={_row_get(r,'is_nullable')}"
-                )
+                # (table_name, column_name, data_type, column_type, is_nullable)
+                print(f"- {r[0]}.{r[1]}: data_type={r[2]}, column_type={r[3]}, nullable={r[4]}")
 
         print("\n## Server setting: max_allowed_packet")
         max_packet = _fetchone(conn, "SHOW VARIABLES LIKE 'max_allowed_packet'")
         if max_packet:
             # row format is often (Variable_name, Value)
-            val = int(_row_get(max_packet, "Value", 1))
+            val = int(max_packet[1])
             print(f"- max_allowed_packet: {val} bytes (~{val/1024/1024:.2f} MB)")
         else:
             print("- Could not read max_allowed_packet")
@@ -135,10 +134,7 @@ def main() -> None:
             "SELECT char_count, LENGTH(content) AS content_len FROM articles WHERE id=:id",
             {"id": article_id},
         )
-        print(
-            f"- Persisted: char_count={_row_get(persisted,'char_count',0)}, "
-            f"content_len={_row_get(persisted,'content_len',1)}"
-        )
+        print(f"- Persisted: char_count={persisted[0]}, content_len={persisted[1]}")
 
         conn.execute(text("DELETE FROM articles WHERE id=:id"), {"id": article_id})
         print("✅ Insert test passed and cleaned up.")
