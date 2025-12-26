@@ -30,6 +30,38 @@ from database import engine
 def _fetchone(conn, sql: str, params: dict | None = None):
     return conn.execute(text(sql), params or {}).fetchone()
 
+
+def _get_table_columns(conn, table_name: str) -> dict:
+    """Return column metadata for a table in the current DB schema."""
+    rows = conn.execute(
+        text(
+            """
+            SELECT column_name, is_nullable, column_default, extra, data_type
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = :table_name
+            """
+        ),
+        {"table_name": table_name},
+    ).fetchall()
+    return {
+        r[0]: {
+            "is_nullable": r[1],
+            "column_default": r[2],
+            "extra": r[3],
+            "data_type": r[4],
+        }
+        for r in rows
+    }
+
+
+def _add_insert_col(insert_cols, insert_vals, params, col: str, expr: str, param_key: str | None = None, param_val=None):
+    insert_cols.append(f"`{col}`")
+    insert_vals.append(expr)
+    if param_key is not None:
+        params[param_key] = param_val
+
+
 def _row_get(row, key: str, index: int | None = None):
     """Robust row accessor across SQLAlchemy versions / row implementations.
 
@@ -109,25 +141,53 @@ def main() -> None:
         content = "A" * test_size_bytes
 
         print(f"- Inserting article id={article_id} (user_id={user_id}) bytes={len(content)}")
-        conn.execute(
-            text(
-                """
-                INSERT INTO articles (
-                  id, title, content, category, tags, prompt_id, user_id, word_count, char_count, metadata, created_at, updated_at
-                ) VALUES (
-                  :id, :title, :content, :category, CAST('[]' AS JSON), NULL, :user_id, NULL, :char_count, CAST('{}' AS JSON), NOW(3), NOW(3)
-                )
-                """
-            ),
-            {
-                "id": article_id,
-                "title": title,
-                "content": content,
-                "category": "Diagnostics",
-                "user_id": user_id,
-                "char_count": len(content),
-            },
-        )
+
+        articles_cols = _get_table_columns(conn, "articles")
+
+        insert_cols: list[str] = []
+        insert_vals: list[str] = []
+        params: dict = {}
+
+        # Required
+        _add_insert_col(insert_cols, insert_vals, params, "id", ":id", "id", article_id)
+        _add_insert_col(insert_cols, insert_vals, params, "title", ":title", "title", title)
+        _add_insert_col(insert_cols, insert_vals, params, "content", ":content", "content", content)
+        _add_insert_col(insert_cols, insert_vals, params, "user_id", ":user_id", "user_id", user_id)
+
+        # Optional common
+        if "category" in articles_cols:
+            _add_insert_col(insert_cols, insert_vals, params, "category", ":category", "category", "Diagnostics")
+        if "tags" in articles_cols:
+            _add_insert_col(insert_cols, insert_vals, params, "tags", "CAST(:tags AS JSON)", "tags", "[]")
+
+        # Optional prompt references
+        if "prompt_id" in articles_cols:
+            _add_insert_col(insert_cols, insert_vals, params, "prompt_id", "NULL")
+        if "prompt_title" in articles_cols:
+            _add_insert_col(insert_cols, insert_vals, params, "prompt_title", "NULL")
+
+        # Counts
+        if "char_count" in articles_cols:
+            _add_insert_col(insert_cols, insert_vals, params, "char_count", ":char_count", "char_count", len(content))
+        if "word_count" in articles_cols:
+            _add_insert_col(insert_cols, insert_vals, params, "word_count", "NULL")
+
+        # Metadata column name differs between schemas
+        if "article_metadata" in articles_cols:
+            _add_insert_col(insert_cols, insert_vals, params, "article_metadata", "CAST(:meta AS JSON)", "meta", "{}")
+        elif "metadata" in articles_cols:
+            _add_insert_col(insert_cols, insert_vals, params, "metadata", "CAST(:meta AS JSON)", "meta", "{}")
+
+        # Timestamps: insert only if NOT NULL and no default
+        for ts_col in ("created_at", "updated_at"):
+            if ts_col in articles_cols:
+                c = articles_cols[ts_col]
+                needs_value = (c["is_nullable"] == "NO" and c["column_default"] is None)
+                if needs_value:
+                    _add_insert_col(insert_cols, insert_vals, params, ts_col, "NOW(3)")
+
+        sql = f"INSERT INTO articles ({', '.join(insert_cols)}) VALUES ({', '.join(insert_vals)})"
+        conn.execute(text(sql), params)
 
         persisted = _fetchone(
             conn,
