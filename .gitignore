@@ -201,3 +201,50 @@ coverage/
 # Local scripts (if any)
 local-*.sh
 private-*.sh
+
+# -----------------------------
+# Python / analysis artifacts
+# -----------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Local virtualenvs (repo already contains some venv folders)
+.venv/
+venv/
+ENV/
+env/
+
+# Temporary article chunking outputs
+tmp_article_chunks/
+
+# One-off analysis outputs generated during research (keep repo clean)
+*_analysis.py
+*_analysis_*.md
+*_analysis_summary.json
+*_volatility_analysis.py
+*_polynomial_analysis.py
+*_polynomial_analysis.png
+*_log_polynomial_analysis.py
+*_log_polynomial_analysis.png
+*_log_polynomial_analysis.md
+*_comprehensive_analysis.py
+*_implied_assumptions.py
+*_revised_valuation.py
+industrial_stock_analysis_*.py
+robust_*_analysis.py
+optimized_stock_analysis.py
+portfolio_10m_rmb.py
+
+# Misc local markdown notes generated during sessions
+COMPLETE_10M_PORTFOLIO.md
+UPDATED_PORTFOLIO_STATUS.md
+CORRECTED_STOCK_SYMBOLS.md
+sp500_evaluation_report.md
+Tencent_0700HK_Damodaran_Valuation_Analysis.md
+Tencent_0700HK_Price_Volume_Analysis.md
+tencent_0700HK_log_polynomial_analysis.md
+angel_yeast_economic_dna_analysis.md
+
+# Avoid accidentally committing a root-level requirements.txt created during experiments
+/requirements.txt
