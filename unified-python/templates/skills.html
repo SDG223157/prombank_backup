@@ -1,0 +1,429 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+</style>
+<div class="px-4 py-6 sm:px-0">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">
+            <i class="fas fa-tools text-cyan-600 mr-2"></i>Skills
+        </h1>
+        <p class="text-gray-600 mt-2">Manage your AI agent skills and capabilities</p>
+    </div>
+
+    <!-- Skills Display with Controls -->
+    <div id="skills-display" x-data="skillsDisplayData()" x-init="init(); loadSkills()">
+        <!-- Actions Bar -->
+        <div class="flex flex-col space-y-4 mb-6">
+            <div class="flex justify-between items-center">
+                <div class="flex space-x-4">
+                    <input type="text" placeholder="Search skills..." 
+                           x-model="searchQuery"
+                           @input="debounceSearch()"
+                           class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+                    <select x-model="selectedCategory" @change="loadSkills()"
+                            class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500">
+                        <option value="">All Categories</option>
+                        <template x-for="category in categories" :key="category">
+                            <option :value="category" x-text="category"></option>
+                        </template>
+                    </select>
+                    <select x-model="sortBy" @change="loadSkills()"
+                            class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500">
+                        <option value="createdAt">Created Date</option>
+                        <option value="updatedAt">Updated Date</option>
+                        <option value="title">Title</option>
+                        <option value="category">Category</option>
+                    </select>
+                    <select x-model="sortOrder" @change="loadSkills()"
+                            class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500">
+                        <option value="desc">Newest First</option>
+                        <option value="asc">Oldest First</option>
+                    </select>
+                </div>
+                <a href="/skills/create" class="bg-cyan-500 text-white px-6 py-2 rounded-lg hover:bg-cyan-600 transition">
+                    <i class="fas fa-plus mr-2"></i>
+                    New Skill
+                </a>
+            </div>
+
+            <!-- View Mode Toggle -->
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-1 bg-gray-100 p-1 rounded-lg">
+                    <button @click="viewMode = 'grid'" 
+                            :class="viewMode === 'grid' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                            class="px-3 py-2 text-sm font-medium rounded-md transition-colors"
+                            title="Grid View">
+                        <i class="fas fa-th text-sm"></i>
+                    </button>
+                    <button @click="viewMode = 'list'" 
+                            :class="viewMode === 'list' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                            class="px-3 py-2 text-sm font-medium rounded-md transition-colors"
+                            title="List View">
+                        <i class="fas fa-list text-sm"></i>
+                    </button>
+                    <button @click="viewMode = 'table'" 
+                            :class="viewMode === 'table' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                            class="px-3 py-2 text-sm font-medium rounded-md transition-colors"
+                            title="Table View">
+                        <i class="fas fa-table text-sm"></i>
+                    </button>
+                </div>
+                
+                <div class="text-sm text-gray-500">
+                    <span x-text="skills.length"></span> skill<span x-text="skills.length !== 1 ? 's' : ''"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Loading State -->
+        <div x-show="loading" class="text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto"></div>
+            <p class="mt-4 text-gray-600">Loading skills...</p>
+        </div>
+        
+        <!-- Empty State -->
+        <div x-show="!loading && skills.length === 0" class="text-center py-12">
+            <div class="text-gray-400 text-6xl mb-4">
+                <i class="fas fa-tools"></i>
+            </div>
+            <h3 class="text-xl font-medium text-gray-900 mb-2">No skills found</h3>
+            <p class="text-gray-600 mb-6">Create your first AI agent skill to get started</p>
+            <a href="/skills/create" class="bg-cyan-500 text-white px-6 py-3 rounded-lg hover:bg-cyan-600 transition">
+                Create Your First Skill
+            </a>
+        </div>
+        
+        <!-- Grid View -->
+        <div x-show="!loading && skills.length > 0 && viewMode === 'grid'" class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <template x-for="skill in skills" :key="skill.id">
+                <div class="bg-white rounded-lg shadow hover:shadow-md transition p-6 border-l-4 border-cyan-500">
+                    <div class="flex items-start justify-between mb-3">
+                        <h3 class="font-semibold text-gray-900 text-lg line-clamp-2" x-text="skill.title"></h3>
+                        <div class="flex items-center space-x-2">
+                            <span x-show="skill.is_public" class="text-green-500" title="Public">
+                                <i class="fas fa-globe text-sm"></i>
+                            </span>
+                            <button @click="deleteSkill(skill.id)" 
+                                    class="text-red-500 hover:text-red-700 transition"
+                                    title="Delete Skill">
+                                <i class="fas fa-trash text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <p class="text-gray-600 mb-4 line-clamp-2 text-sm" x-text="skill.description || 'No description'"></p>
+                    
+                    <div class="space-y-2 mb-4">
+                        <div class="flex items-center text-sm text-gray-500">
+                            <i class="fas fa-folder mr-2 text-cyan-500"></i>
+                            <span x-text="skill.category || 'Uncategorized'"></span>
+                        </div>
+                        <div class="flex items-center text-sm text-gray-500">
+                            <i class="fas fa-file-code mr-2 text-cyan-500"></i>
+                            <span x-text="skill.file_count"></span> file<span x-text="skill.file_count !== 1 ? 's' : ''"></span>
+                        </div>
+                        <div class="flex items-center text-sm text-gray-500">
+                            <i class="fas fa-calendar mr-2 text-cyan-500"></i>
+                            <span x-text="formatDate(skill.created_at)"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-1 mb-4">
+                        <template x-for="tag in (skill.tags || []).slice(0, 3)" :key="tag">
+                            <span class="bg-cyan-100 text-cyan-700 px-2 py-1 rounded text-xs" x-text="tag"></span>
+                        </template>
+                        <span x-show="(skill.tags || []).length > 3" class="text-gray-400 text-xs">
+                            +<span x-text="(skill.tags || []).length - 3"></span> more
+                        </span>
+                    </div>
+                    
+                    <div class="flex space-x-2">
+                        <a :href="`/skills/${skill.id}`" 
+                           class="flex-1 bg-cyan-500 text-white text-center py-2 rounded hover:bg-cyan-600 transition">
+                            <i class="fas fa-eye mr-2"></i>View
+                        </a>
+                        <a :href="`/skills/${skill.id}/edit`" 
+                           class="flex-1 bg-gray-500 text-white text-center py-2 rounded hover:bg-gray-600 transition">
+                            <i class="fas fa-edit mr-2"></i>Edit
+                        </a>
+                    </div>
+                </div>
+            </template>
+        </div>
+        
+        <!-- List View -->
+        <div x-show="!loading && skills.length > 0 && viewMode === 'list'" class="space-y-4">
+            <template x-for="skill in skills" :key="skill.id">
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-cyan-500">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-3 mb-2">
+                                <h3 class="font-semibold text-gray-900 text-xl" x-text="skill.title"></h3>
+                                <span x-show="skill.is_public" class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
+                                    <i class="fas fa-globe mr-1"></i>Public
+                                </span>
+                            </div>
+                            <p class="text-gray-600 mb-3" x-text="skill.description || 'No description'"></p>
+                            <div class="flex items-center space-x-4 text-sm text-gray-500 mb-3">
+                                <span>
+                                    <i class="fas fa-folder mr-1 text-cyan-500"></i>
+                                    <span x-text="skill.category || 'Uncategorized'"></span>
+                                </span>
+                                <span>
+                                    <i class="fas fa-file-code mr-1 text-cyan-500"></i>
+                                    <span x-text="skill.file_count"></span> files
+                                </span>
+                                <span>
+                                    <i class="fas fa-calendar mr-1 text-cyan-500"></i>
+                                    <span x-text="formatDate(skill.created_at)"></span>
+                                </span>
+                            </div>
+                            <div class="flex flex-wrap gap-1">
+                                <template x-for="tag in (skill.tags || [])" :key="tag">
+                                    <span class="bg-cyan-100 text-cyan-700 px-2 py-1 rounded text-xs" x-text="tag"></span>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 ml-4">
+                            <a :href="`/skills/${skill.id}`" 
+                               class="bg-cyan-500 text-white px-4 py-2 rounded hover:bg-cyan-600 transition">
+                                <i class="fas fa-eye mr-2"></i>View
+                            </a>
+                            <a :href="`/skills/${skill.id}/edit`" 
+                               class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition">
+                                <i class="fas fa-edit mr-2"></i>Edit
+                            </a>
+                            <button @click="deleteSkill(skill.id)" 
+                                    class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition">
+                                <i class="fas fa-trash mr-2"></i>Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+        
+        <!-- Table View -->
+        <div x-show="!loading && skills.length > 0 && viewMode === 'table'" class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Files</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visibility</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-for="skill in skills" :key="skill.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4">
+                                <div class="text-sm font-medium text-gray-900" x-text="skill.title"></div>
+                                <div class="text-sm text-gray-500 line-clamp-1" x-text="skill.description"></div>
+                                <div class="flex flex-wrap gap-1 mt-1">
+                                    <template x-for="tag in (skill.tags || []).slice(0, 2)" :key="tag">
+                                        <span class="bg-cyan-100 text-cyan-600 px-2 py-0.5 rounded text-xs" x-text="tag"></span>
+                                    </template>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="text-sm text-gray-900" x-text="skill.category || 'Uncategorized'"></span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="text-sm text-gray-900" x-text="skill.file_count"></span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="text-sm text-gray-900" x-text="formatDate(skill.created_at)"></span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span x-show="skill.is_public" class="text-green-600 text-sm">
+                                    <i class="fas fa-globe mr-1"></i>Public
+                                </span>
+                                <span x-show="!skill.is_public" class="text-gray-500 text-sm">
+                                    <i class="fas fa-lock mr-1"></i>Private
+                                </span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="flex space-x-2">
+                                    <a :href="`/skills/${skill.id}`" 
+                                       class="text-cyan-600 hover:text-cyan-800 transition" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a :href="`/skills/${skill.id}/edit`" 
+                                       class="text-gray-600 hover:text-gray-800 transition" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button @click="deleteSkill(skill.id)" 
+                                            class="text-red-600 hover:text-red-800 transition" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        <div x-show="!loading && skills.length > 0" class="mt-6 flex items-center justify-between">
+            <div class="text-sm text-gray-700">
+                Showing <span x-text="((currentPage - 1) * pageSize) + 1"></span> to 
+                <span x-text="Math.min(currentPage * pageSize, totalCount)"></span> of 
+                <span x-text="totalCount"></span> skills
+            </div>
+            <div class="flex space-x-2">
+                <button @click="loadPage(currentPage - 1)" 
+                        :disabled="currentPage <= 1"
+                        :class="currentPage <= 1 ? 'bg-gray-200 text-gray-400' : 'bg-white text-gray-700 hover:bg-gray-50'"
+                        class="px-3 py-2 border border-gray-300 rounded-md transition">
+                    Previous
+                </button>
+                <span class="px-3 py-2 bg-cyan-500 text-white rounded-md">
+                    <span x-text="currentPage"></span> / <span x-text="totalPages"></span>
+                </span>
+                <button @click="loadPage(currentPage + 1)" 
+                        :disabled="currentPage >= totalPages"
+                        :class="currentPage >= totalPages ? 'bg-gray-200 text-gray-400' : 'bg-white text-gray-700 hover:bg-gray-50'"
+                        class="px-3 py-2 border border-gray-300 rounded-md transition">
+                    Next
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function skillsDisplayData() {
+    return {
+        skills: [],
+        categories: [],
+        loading: false,
+        viewMode: 'grid',
+        searchQuery: '',
+        selectedCategory: '',
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        currentPage: 1,
+        pageSize: 12,
+        totalCount: 0,
+        totalPages: 1,
+        searchTimeout: null,
+        
+        init() {
+            // Load view mode preference
+            this.viewMode = localStorage.getItem('skills-view-mode') || 'grid';
+            
+            // Watch for view mode changes
+            this.$watch('viewMode', (value) => {
+                localStorage.setItem('skills-view-mode', value);
+            });
+        },
+        
+        async loadSkills() {
+            this.loading = true;
+            try {
+                const params = new URLSearchParams({
+                    page: this.currentPage.toString(),
+                    limit: this.pageSize.toString(),
+                    sortBy: this.sortBy,
+                    sortOrder: this.sortOrder
+                });
+                
+                if (this.selectedCategory) {
+                    params.append('category', this.selectedCategory);
+                }
+                
+                if (this.searchQuery.trim()) {
+                    params.append('search', this.searchQuery.trim());
+                }
+                
+                const response = await fetch(`/api/skills?${params}`, {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/api/auth/google';
+                        return;
+                    }
+                    throw new Error('Failed to load skills');
+                }
+                
+                const data = await response.json();
+                this.skills = data.skills || [];
+                this.categories = data.categories || [];
+                this.totalCount = data.pagination?.total_count || 0;
+                this.totalPages = data.pagination?.total_pages || 1;
+                this.currentPage = data.pagination?.page || 1;
+                
+            } catch (error) {
+                console.error('Error loading skills:', error);
+                alert('Failed to load skills: ' + error.message);
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        async deleteSkill(skillId) {
+            if (!confirm('Are you sure you want to delete this skill? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/skills/${skillId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to delete skill');
+                }
+                
+                // Reload skills
+                await this.loadSkills();
+                
+            } catch (error) {
+                console.error('Error deleting skill:', error);
+                alert('Failed to delete skill: ' + error.message);
+            }
+        },
+        
+        loadPage(page) {
+            if (page >= 1 && page <= this.totalPages) {
+                this.currentPage = page;
+                this.loadSkills();
+            }
+        },
+        
+        debounceSearch() {
+            clearTimeout(this.searchTimeout);
+            this.searchTimeout = setTimeout(() => {
+                this.currentPage = 1;
+                this.loadSkills();
+            }, 500);
+        },
+        
+        formatDate(dateString) {
+            if (!dateString) return '';
+            return new Date(dateString).toLocaleDateString();
+        }
+    };
+}
+</script>
+{% endblock %}

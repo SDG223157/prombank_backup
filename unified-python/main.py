@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text, func
-from database import get_db, connect_with_retry, create_tables, User, Prompt, Token, Article
+from database import get_db, connect_with_retry, create_tables, User, Prompt, Token, Article, Skill
 from auth import setup_oauth, create_access_token, get_current_user, require_auth, create_or_update_user_from_google, generate_api_token, hash_token, get_current_user_or_token
 import uuid
 import httpx
@@ -69,6 +69,31 @@ class ImportArticleModel(BaseModel):
 
 class BulkImportArticlesRequest(BaseModel):
     articles: List[ImportArticleModel]
+
+# Skill Pydantic Models
+class SkillFileModel(BaseModel):
+    filename: str
+    content: str
+
+class CreateSkillRequest(BaseModel):
+    title: str
+    description: str = None
+    content: str  # Main SKILL.md content
+    files: List[SkillFileModel] = []  # Additional files
+    category: str = None
+    tags: List[str] = []
+    is_public: bool = False
+    metadata: Dict[str, Any] = {}
+
+class UpdateSkillRequest(BaseModel):
+    title: str = None
+    description: str = None
+    content: str = None
+    files: List[SkillFileModel] = None
+    category: str = None
+    tags: List[str] = None
+    is_public: bool = None
+    metadata: Dict[str, Any] = None
 
 def calculate_counts(content: str) -> tuple:
     """Calculate word and character counts for content"""
@@ -2376,6 +2401,414 @@ async def serve_edit_article(request: Request, article_id: str):
         "request": request,
         "title": "Edit Article - Prompt House Premium",
         "article_id": article_id
+    })
+
+# ============================================
+# Skills API Routes
+# ============================================
+
+@app.get("/api/skills")
+async def get_skills(
+    request: Request,
+    page: int = 1,
+    limit: int = 20,
+    sortBy: str = "createdAt",
+    sortOrder: str = "desc",
+    category: str = None,
+    search: str = None,
+    db: Session = Depends(get_db)
+):
+    """Get all skills for the current user"""
+    current_user = get_current_user_or_token(request, db)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        # Build query
+        query = db.query(Skill).filter(Skill.user_id == current_user.id)
+        
+        # Apply search filter
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                (Skill.title.ilike(search_term)) | 
+                (Skill.description.ilike(search_term))
+            )
+        
+        # Apply category filter
+        if category:
+            query = query.filter(Skill.category == category)
+        
+        # Get total count before pagination
+        total_count = query.count()
+        
+        # Apply sorting
+        sort_column_map = {
+            "title": Skill.title,
+            "category": Skill.category,
+            "createdAt": Skill.created_at,
+            "updatedAt": Skill.updated_at
+        }
+        sort_column = sort_column_map.get(sortBy, Skill.created_at)
+        
+        if sortOrder == "asc":
+            query = query.order_by(sort_column.asc())
+        else:
+            query = query.order_by(sort_column.desc())
+        
+        # Apply pagination
+        offset = (page - 1) * limit
+        skills = query.offset(offset).limit(limit).all()
+        
+        # Get unique categories for filter dropdown
+        categories = db.query(Skill.category).filter(
+            Skill.user_id == current_user.id,
+            Skill.category.isnot(None)
+        ).distinct().all()
+        categories = [c[0] for c in categories if c[0]]
+        
+        # Format response
+        skills_list = []
+        for skill in skills:
+            skills_list.append({
+                "id": skill.id,
+                "title": skill.title,
+                "description": skill.description,
+                "content": skill.content[:500] + "..." if len(skill.content) > 500 else skill.content,
+                "files": skill.files or [],
+                "category": skill.category,
+                "tags": skill.tags or [],
+                "is_public": skill.is_public,
+                "file_count": len(skill.files or []) + 1,  # +1 for SKILL.md
+                "created_at": skill.created_at.isoformat() if skill.created_at else None,
+                "updated_at": skill.updated_at.isoformat() if skill.updated_at else None
+            })
+        
+        return {
+            "skills": skills_list,
+            "categories": categories,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total_count": total_count,
+                "total_pages": (total_count + limit - 1) // limit
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching skills: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch skills")
+
+@app.get("/api/skills/{skill_id}")
+async def get_skill(skill_id: str, request: Request, db: Session = Depends(get_db)):
+    """Get a specific skill"""
+    current_user = get_current_user_or_token(request, db)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        skill = db.query(Skill).filter(
+            Skill.id == skill_id,
+            Skill.user_id == current_user.id
+        ).first()
+        
+        if not skill:
+            raise HTTPException(status_code=404, detail="Skill not found")
+        
+        return {
+            "id": skill.id,
+            "title": skill.title,
+            "description": skill.description,
+            "content": skill.content,
+            "files": skill.files or [],
+            "category": skill.category,
+            "tags": skill.tags or [],
+            "is_public": skill.is_public,
+            "metadata": skill.skill_metadata or {},
+            "created_at": skill.created_at.isoformat() if skill.created_at else None,
+            "updated_at": skill.updated_at.isoformat() if skill.updated_at else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching skill: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch skill")
+
+@app.post("/api/skills")
+async def create_skill(
+    skill_data: CreateSkillRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Create a new skill"""
+    current_user = get_current_user_or_token(request, db)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        skill_id = str(uuid.uuid4())
+        
+        # Convert files to list of dicts
+        files_data = [{"filename": f.filename, "content": f.content} for f in skill_data.files]
+        
+        new_skill = Skill(
+            id=skill_id,
+            title=skill_data.title,
+            description=skill_data.description,
+            content=skill_data.content,
+            files=files_data,
+            category=skill_data.category,
+            tags=skill_data.tags,
+            is_public=skill_data.is_public,
+            skill_metadata=skill_data.metadata or {},
+            user_id=current_user.id,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        
+        db.add(new_skill)
+        db.commit()
+        db.refresh(new_skill)
+        
+        logger.info(f"Created skill: {skill_id} for user {current_user.id}")
+        
+        return {
+            "id": new_skill.id,
+            "title": new_skill.title,
+            "description": new_skill.description,
+            "content": new_skill.content,
+            "files": new_skill.files,
+            "category": new_skill.category,
+            "tags": new_skill.tags,
+            "is_public": new_skill.is_public,
+            "created_at": new_skill.created_at.isoformat() if new_skill.created_at else None,
+            "updated_at": new_skill.updated_at.isoformat() if new_skill.updated_at else None
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creating skill: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to create skill")
+
+@app.put("/api/skills/{skill_id}")
+async def update_skill(
+    skill_id: str,
+    skill_data: UpdateSkillRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Update an existing skill"""
+    current_user = get_current_user_or_token(request, db)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        skill = db.query(Skill).filter(
+            Skill.id == skill_id,
+            Skill.user_id == current_user.id
+        ).first()
+        
+        if not skill:
+            raise HTTPException(status_code=404, detail="Skill not found")
+        
+        # Update fields if provided
+        if skill_data.title is not None:
+            skill.title = skill_data.title
+        if skill_data.description is not None:
+            skill.description = skill_data.description
+        if skill_data.content is not None:
+            skill.content = skill_data.content
+        if skill_data.files is not None:
+            skill.files = [{"filename": f.filename, "content": f.content} for f in skill_data.files]
+        if skill_data.category is not None:
+            skill.category = skill_data.category
+        if skill_data.tags is not None:
+            skill.tags = skill_data.tags
+        if skill_data.is_public is not None:
+            skill.is_public = skill_data.is_public
+        if skill_data.metadata is not None:
+            skill.skill_metadata = skill_data.metadata
+        
+        skill.updated_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(skill)
+        
+        logger.info(f"Updated skill: {skill_id}")
+        
+        return {
+            "id": skill.id,
+            "title": skill.title,
+            "description": skill.description,
+            "content": skill.content,
+            "files": skill.files,
+            "category": skill.category,
+            "tags": skill.tags,
+            "is_public": skill.is_public,
+            "created_at": skill.created_at.isoformat() if skill.created_at else None,
+            "updated_at": skill.updated_at.isoformat() if skill.updated_at else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating skill: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update skill")
+
+@app.delete("/api/skills/{skill_id}")
+async def delete_skill(skill_id: str, request: Request, db: Session = Depends(get_db)):
+    """Delete a skill"""
+    current_user = get_current_user_or_token(request, db)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        skill = db.query(Skill).filter(
+            Skill.id == skill_id,
+            Skill.user_id == current_user.id
+        ).first()
+        
+        if not skill:
+            raise HTTPException(status_code=404, detail="Skill not found")
+        
+        db.delete(skill)
+        db.commit()
+        
+        logger.info(f"Deleted skill: {skill_id}")
+        
+        return {"success": True, "message": "Skill deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting skill: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete skill")
+
+@app.post("/api/skills/{skill_id}/files")
+async def add_skill_file(
+    skill_id: str,
+    file_data: SkillFileModel,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Add a file to an existing skill"""
+    current_user = get_current_user_or_token(request, db)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        skill = db.query(Skill).filter(
+            Skill.id == skill_id,
+            Skill.user_id == current_user.id
+        ).first()
+        
+        if not skill:
+            raise HTTPException(status_code=404, detail="Skill not found")
+        
+        # Add the new file
+        files = skill.files or []
+        files.append({"filename": file_data.filename, "content": file_data.content})
+        skill.files = files
+        skill.updated_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(skill)
+        
+        return {
+            "success": True,
+            "message": f"File '{file_data.filename}' added successfully",
+            "files": skill.files
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding file to skill: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to add file to skill")
+
+@app.delete("/api/skills/{skill_id}/files/{filename:path}")
+async def remove_skill_file(
+    skill_id: str,
+    filename: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Remove a file from a skill"""
+    current_user = get_current_user_or_token(request, db)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        skill = db.query(Skill).filter(
+            Skill.id == skill_id,
+            Skill.user_id == current_user.id
+        ).first()
+        
+        if not skill:
+            raise HTTPException(status_code=404, detail="Skill not found")
+        
+        # Remove the file
+        files = skill.files or []
+        files = [f for f in files if f.get("filename") != filename]
+        skill.files = files
+        skill.updated_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(skill)
+        
+        return {
+            "success": True,
+            "message": f"File '{filename}' removed successfully",
+            "files": skill.files
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing file from skill: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to remove file from skill")
+
+# ============================================
+# Skills Frontend Routes
+# ============================================
+
+@app.get("/skills", response_class=HTMLResponse)
+async def serve_skills(request: Request):
+    """Serve the skills list page"""
+    return templates.TemplateResponse("skills.html", {
+        "request": request,
+        "title": "Skills - Prompt House Premium"
+    })
+
+@app.get("/skills/create", response_class=HTMLResponse)
+async def serve_create_skill(request: Request):
+    """Serve the create skill page"""
+    return templates.TemplateResponse("create_skill.html", {
+        "request": request,
+        "title": "Create Skill - Prompt House Premium"
+    })
+
+@app.get("/skills/{skill_id}", response_class=HTMLResponse)
+async def serve_view_skill(request: Request, skill_id: str):
+    """Serve the view skill page"""
+    return templates.TemplateResponse("view_skill.html", {
+        "request": request,
+        "title": "View Skill - Prompt House Premium",
+        "skill_id": skill_id
+    })
+
+@app.get("/skills/{skill_id}/edit", response_class=HTMLResponse)
+async def serve_edit_skill(request: Request, skill_id: str):
+    """Serve the edit skill page"""
+    return templates.TemplateResponse("edit_skill.html", {
+        "request": request,
+        "title": "Edit Skill - Prompt House Premium",
+        "skill_id": skill_id
     })
 
 # Feature Pages

@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0" x-data="createSkillData()" x-init="init()">
+    <div class="mb-8">
+        <a href="/skills" class="text-cyan-600 hover:text-cyan-700 mb-4 inline-block">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Skills
+        </a>
+        <h1 class="text-3xl font-bold text-gray-900">
+            <i class="fas fa-plus-circle text-cyan-600 mr-2"></i>Create New Skill
+        </h1>
+        <p class="text-gray-600 mt-2">Create a new AI agent skill with SKILL.md and supporting files</p>
+    </div>
+
+    <form @submit.prevent="createSkill()" class="space-y-6">
+        <!-- Basic Info Card -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-info-circle text-cyan-500 mr-2"></i>Basic Information
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Title <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" x-model="skill.title" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                           placeholder="e.g., Code Reviewer">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                    <input type="text" x-model="skill.category"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                           placeholder="e.g., Development, Writing, Analysis">
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <textarea x-model="skill.description" rows="3"
+                          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                          placeholder="Describe what this skill does..."></textarea>
+            </div>
+            
+            <div class="mt-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+                <div class="flex flex-wrap gap-2 mb-2">
+                    <template x-for="(tag, index) in skill.tags" :key="index">
+                        <span class="bg-cyan-100 text-cyan-700 px-3 py-1 rounded-full text-sm flex items-center">
+                            <span x-text="tag"></span>
+                            <button type="button" @click="removeTag(index)" class="ml-2 text-cyan-500 hover:text-cyan-700">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </span>
+                    </template>
+                </div>
+                <div class="flex space-x-2">
+                    <input type="text" x-model="newTag" @keydown.enter.prevent="addTag()"
+                           class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                           placeholder="Add a tag and press Enter">
+                    <button type="button" @click="addTag()" 
+                            class="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition">
+                        Add Tag
+                    </button>
+                </div>
+            </div>
+            
+            <div class="mt-4 flex items-center">
+                <input type="checkbox" x-model="skill.is_public" id="is_public"
+                       class="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-gray-300 rounded">
+                <label for="is_public" class="ml-2 text-sm text-gray-700">
+                    Make this skill public
+                </label>
+            </div>
+        </div>
+
+        <!-- SKILL.md Content Card -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-file-code text-cyan-500 mr-2"></i>SKILL.md Content
+                <span class="text-red-500">*</span>
+            </h2>
+            <p class="text-sm text-gray-600 mb-4">
+                The main skill definition file. Use Markdown to define instructions, capabilities, and guidelines.
+            </p>
+            <textarea x-model="skill.content" rows="20" required
+                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent font-mono text-sm"
+                      placeholder="# Skill Name
+
+## Description
+Describe what this skill does...
+
+## Capabilities
+- Capability 1
+- Capability 2
+
+## Instructions
+Step-by-step instructions for the AI agent...
+
+## Examples
+Provide examples of how to use this skill..."></textarea>
+        </div>
+
+        <!-- Additional Files Card -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-folder-open text-cyan-500 mr-2"></i>Additional Files
+                <span class="text-gray-400 text-sm font-normal">(Optional)</span>
+            </h2>
+            <p class="text-sm text-gray-600 mb-4">
+                Add reference documents, scripts, or configuration files to support the skill.
+            </p>
+            
+            <!-- Existing Files -->
+            <div x-show="skill.files.length > 0" class="space-y-4 mb-6">
+                <template x-for="(file, index) in skill.files" :key="index">
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-file-alt text-cyan-500"></i>
+                                <input type="text" x-model="file.filename"
+                                       class="px-3 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm"
+                                       placeholder="filename.md">
+                            </div>
+                            <button type="button" @click="removeFile(index)" 
+                                    class="text-red-500 hover:text-red-700 transition">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        <textarea x-model="file.content" rows="8"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent font-mono text-sm"
+                                  placeholder="File content..."></textarea>
+                    </div>
+                </template>
+            </div>
+            
+            <!-- Add File Button -->
+            <button type="button" @click="addFile()" 
+                    class="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:text-cyan-600 hover:border-cyan-500 transition">
+                <i class="fas fa-plus mr-2"></i>Add File
+            </button>
+        </div>
+
+        <!-- Submit Buttons -->
+        <div class="flex justify-end space-x-4">
+            <a href="/skills" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition">
+                Cancel
+            </a>
+            <button type="submit" :disabled="saving"
+                    class="px-6 py-3 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                <span x-show="!saving">
+                    <i class="fas fa-save mr-2"></i>Create Skill
+                </span>
+                <span x-show="saving">
+                    <i class="fas fa-spinner fa-spin mr-2"></i>Creating...
+                </span>
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function createSkillData() {
+    return {
+        skill: {
+            title: '',
+            description: '',
+            content: '',
+            category: '',
+            tags: [],
+            is_public: false,
+            files: []
+        },
+        newTag: '',
+        saving: false,
+        
+        init() {
+            // Pre-populate with template
+            this.skill.content = `# Skill Name
+
+## Description
+Describe what this skill does and when it should be used.
+
+## Capabilities
+- List the main capabilities
+- What can this skill do?
+
+## Instructions
+Provide detailed instructions for the AI agent:
+
+1. First step
+2. Second step
+3. Third step
+
+## Examples
+
+### Example 1
+Input: ...
+Output: ...
+
+### Example 2
+Input: ...
+Output: ...
+
+## Notes
+Any additional notes or considerations.
+`;
+        },
+        
+        addTag() {
+            if (this.newTag.trim() && !this.skill.tags.includes(this.newTag.trim())) {
+                this.skill.tags.push(this.newTag.trim());
+                this.newTag = '';
+            }
+        },
+        
+        removeTag(index) {
+            this.skill.tags.splice(index, 1);
+        },
+        
+        addFile() {
+            this.skill.files.push({
+                filename: '',
+                content: ''
+            });
+        },
+        
+        removeFile(index) {
+            this.skill.files.splice(index, 1);
+        },
+        
+        async createSkill() {
+            if (!this.skill.title.trim()) {
+                alert('Please enter a skill title');
+                return;
+            }
+            
+            if (!this.skill.content.trim()) {
+                alert('Please enter the SKILL.md content');
+                return;
+            }
+            
+            // Validate files have filenames
+            for (let file of this.skill.files) {
+                if (file.content.trim() && !file.filename.trim()) {
+                    alert('Please enter a filename for all files');
+                    return;
+                }
+            }
+            
+            // Filter out empty files
+            const validFiles = this.skill.files.filter(f => f.filename.trim() && f.content.trim());
+            
+            this.saving = true;
+            
+            try {
+                const response = await fetch('/api/skills', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        title: this.skill.title.trim(),
+                        description: this.skill.description.trim() || null,
+                        content: this.skill.content,
+                        category: this.skill.category.trim() || null,
+                        tags: this.skill.tags,
+                        is_public: this.skill.is_public,
+                        files: validFiles
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to create skill');
+                }
+                
+                const data = await response.json();
+                
+                // Redirect to the new skill
+                window.location.href = `/skills/${data.id}`;
+                
+            } catch (error) {
+                console.error('Error creating skill:', error);
+                alert('Failed to create skill: ' + error.message);
+            } finally {
+                this.saving = false;
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

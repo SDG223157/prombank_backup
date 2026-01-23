@@ -100,6 +100,24 @@ class Article(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class Skill(Base):
+    __tablename__ = "skills"
+    
+    id = Column(String(255), primary_key=True)
+    title = Column(String(500), nullable=False)
+    description = Column(Text().with_variant(LONGTEXT(), "mysql"), nullable=True)
+    # Main SKILL.md content
+    content = Column(Text().with_variant(LONGTEXT(), "mysql"), nullable=False)
+    # Additional files stored as JSON: [{"filename": "reference.md", "content": "..."}, ...]
+    files = Column(JSON, default=list)
+    category = Column(String(255), nullable=True)
+    tags = Column(JSON, default=list)
+    user_id = Column(String(255), nullable=False)
+    is_public = Column(Boolean, default=False)
+    skill_metadata = Column(JSON, default=dict)  # Additional metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 def get_db():
     db = SessionLocal()
     try:
