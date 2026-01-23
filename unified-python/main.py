@@ -2773,6 +2773,269 @@ async def remove_skill_file(
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to remove file from skill")
 
+@app.post("/api/skills/import/cursor")
+async def import_skills_from_cursor(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Import skills from local .claude/skills/ directory"""
+    current_user = get_current_user_or_token(request, db)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        # Look for .claude/skills directory in common locations
+        possible_paths = [
+            Path.home() / "prombank_backup" / ".claude" / "skills",
+            Path.home() / ".claude" / "skills",
+            Path("/Users/sdg223157/prombank_backup/.claude/skills"),
+            Path.cwd().parent / ".claude" / "skills",
+            Path.cwd() / ".claude" / "skills",
+        ]
+        
+        skills_dir = None
+        for path in possible_paths:
+            if path.exists() and path.is_dir():
+                skills_dir = path
+                break
+        
+        if not skills_dir:
+            raise HTTPException(
+                status_code=404, 
+                detail="Could not find .claude/skills directory. Please ensure it exists."
+            )
+        
+        imported_skills = []
+        skipped_skills = []
+        errors = []
+        
+        # Iterate through skill directories
+        for skill_folder in skills_dir.iterdir():
+            if not skill_folder.is_dir():
+                continue
+            
+            skill_md_path = skill_folder / "SKILL.md"
+            if not skill_md_path.exists():
+                skipped_skills.append({
+                    "folder": skill_folder.name,
+                    "reason": "No SKILL.md file found"
+                })
+                continue
+            
+            try:
+                # Read SKILL.md content
+                with open(skill_md_path, 'r', encoding='utf-8') as f:
+                    skill_content = f.read()
+                
+                # Extract title from first heading or folder name
+                title = skill_folder.name.replace('-', ' ').replace('_', ' ').title()
+                lines = skill_content.split('\n')
+                for line in lines:
+                    if line.startswith('# '):
+                        title = line[2:].strip()
+                        break
+                
+                # Extract description from content (first paragraph after title)
+                description = ""
+                in_description = False
+                for line in lines:
+                    if line.startswith('## Description'):
+                        in_description = True
+                        continue
+                    if in_description:
+                        if line.startswith('##'):
+                            break
+                        if line.strip():
+                            description = line.strip()
+                            break
+                
+                # Check if skill already exists (by title for this user)
+                existing_skill = db.query(Skill).filter(
+                    Skill.user_id == current_user.id,
+                    Skill.title == title
+                ).first()
+                
+                if existing_skill:
+                    skipped_skills.append({
+                        "folder": skill_folder.name,
+                        "title": title,
+                        "reason": "Skill with same title already exists"
+                    })
+                    continue
+                
+                # Read additional files
+                additional_files = []
+                for file_path in skill_folder.iterdir():
+                    if file_path.is_file() and file_path.name != "SKILL.md":
+                        # Skip hidden files and common non-content files
+                        if file_path.name.startswith('.'):
+                            continue
+                        if file_path.suffix in ['.pyc', '.pyo', '.so', '.dylib']:
+                            continue
+                        
+                        try:
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                file_content = f.read()
+                            additional_files.append({
+                                "filename": file_path.name,
+                                "content": file_content
+                            })
+                        except Exception as e:
+                            logger.warning(f"Could not read file {file_path}: {e}")
+                
+                # Determine category from folder structure or content
+                category = "Imported from Cursor"
+                
+                # Create the skill
+                skill_id = str(uuid.uuid4())
+                new_skill = Skill(
+                    id=skill_id,
+                    title=title,
+                    description=description or f"Imported from {skill_folder.name}",
+                    content=skill_content,
+                    files=additional_files,
+                    category=category,
+                    tags=["cursor", "imported", skill_folder.name.replace('-', ' ')],
+                    is_public=False,
+                    skill_metadata={
+                        "source": "cursor",
+                        "source_folder": skill_folder.name,
+                        "imported_at": datetime.utcnow().isoformat()
+                    },
+                    user_id=current_user.id,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                
+                db.add(new_skill)
+                db.commit()
+                
+                imported_skills.append({
+                    "id": skill_id,
+                    "title": title,
+                    "folder": skill_folder.name,
+                    "file_count": len(additional_files) + 1
+                })
+                
+                logger.info(f"Imported skill: {title} from {skill_folder.name}")
+                
+            except Exception as e:
+                logger.error(f"Error importing skill from {skill_folder.name}: {e}")
+                errors.append({
+                    "folder": skill_folder.name,
+                    "error": str(e)
+                })
+                db.rollback()
+        
+        return {
+            "success": True,
+            "message": f"Imported {len(imported_skills)} skills",
+            "skills_dir": str(skills_dir),
+            "imported": imported_skills,
+            "skipped": skipped_skills,
+            "errors": errors
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error importing skills from Cursor: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to import skills: {str(e)}")
+
+@app.get("/api/skills/scan/cursor")
+async def scan_cursor_skills(request: Request, db: Session = Depends(get_db)):
+    """Scan and list available skills from .claude/skills/ directory without importing"""
+    current_user = get_current_user_or_token(request, db)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        # Look for .claude/skills directory
+        possible_paths = [
+            Path.home() / "prombank_backup" / ".claude" / "skills",
+            Path.home() / ".claude" / "skills",
+            Path("/Users/sdg223157/prombank_backup/.claude/skills"),
+            Path.cwd().parent / ".claude" / "skills",
+            Path.cwd() / ".claude" / "skills",
+        ]
+        
+        skills_dir = None
+        for path in possible_paths:
+            if path.exists() and path.is_dir():
+                skills_dir = path
+                break
+        
+        if not skills_dir:
+            return {
+                "found": False,
+                "message": "Could not find .claude/skills directory",
+                "skills": []
+            }
+        
+        available_skills = []
+        
+        for skill_folder in skills_dir.iterdir():
+            if not skill_folder.is_dir():
+                continue
+            
+            skill_md_path = skill_folder / "SKILL.md"
+            has_skill_md = skill_md_path.exists()
+            
+            # Count files
+            file_count = sum(1 for f in skill_folder.iterdir() if f.is_file() and not f.name.startswith('.'))
+            
+            # Extract title if SKILL.md exists
+            title = skill_folder.name.replace('-', ' ').replace('_', ' ').title()
+            description = ""
+            
+            if has_skill_md:
+                try:
+                    with open(skill_md_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    lines = content.split('\n')
+                    for line in lines:
+                        if line.startswith('# '):
+                            title = line[2:].strip()
+                            break
+                    # Get description
+                    in_desc = False
+                    for line in lines:
+                        if line.startswith('## Description'):
+                            in_desc = True
+                            continue
+                        if in_desc and line.strip() and not line.startswith('#'):
+                            description = line.strip()[:200]
+                            break
+                except:
+                    pass
+            
+            # Check if already imported
+            existing = db.query(Skill).filter(
+                Skill.user_id == current_user.id,
+                Skill.title == title
+            ).first()
+            
+            available_skills.append({
+                "folder": skill_folder.name,
+                "title": title,
+                "description": description,
+                "has_skill_md": has_skill_md,
+                "file_count": file_count,
+                "already_imported": existing is not None
+            })
+        
+        return {
+            "found": True,
+            "skills_dir": str(skills_dir),
+            "skills": available_skills,
+            "total": len(available_skills),
+            "importable": sum(1 for s in available_skills if s["has_skill_md"] and not s["already_imported"])
+        }
+        
+    except Exception as e:
+        logger.error(f"Error scanning Cursor skills: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to scan skills: {str(e)}")
+
 # ============================================
 # Skills Frontend Routes
 # ============================================
