@@ -1716,6 +1716,120 @@ async def mcp_import_articles(request: Request, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"MCP article import failed: {str(e)}")
 
+# MCP Image Upload endpoint
+@app.post("/api/mcp/upload-image")
+async def mcp_upload_image(request: Request, db: Session = Depends(get_db)):
+    """MCP endpoint to upload an image (requires API token)
+    
+    Accepts:
+    - base64: Base64-encoded image data
+    - filename: Desired filename (optional, will be auto-generated if not provided)
+    - folder: Subfolder within static/images (optional, defaults to root)
+    
+    Returns:
+    - url: Web-accessible URL for the image
+    - path: Full filesystem path
+    - filename: Final filename used
+    """
+    import base64
+    import hashlib
+    from datetime import datetime
+    
+    current_user = get_current_user_or_token(request, db)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="API token required")
+    
+    try:
+        data = await request.json()
+        
+        # Get base64 image data
+        image_base64 = data.get("base64")
+        if not image_base64:
+            raise HTTPException(status_code=400, detail="base64 image data is required")
+        
+        # Remove data URL prefix if present (e.g., "data:image/png;base64,")
+        if "," in image_base64:
+            image_base64 = image_base64.split(",", 1)[1]
+        
+        # Decode base64
+        try:
+            image_data = base64.b64decode(image_base64)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid base64 data: {str(e)}")
+        
+        # Determine file extension from image header or filename
+        filename = data.get("filename", "")
+        if not filename:
+            # Auto-detect image type from header bytes
+            if image_data[:8] == b'\x89PNG\r\n\x1a\n':
+                ext = ".png"
+            elif image_data[:2] == b'\xff\xd8':
+                ext = ".jpg"
+            elif image_data[:6] in (b'GIF87a', b'GIF89a'):
+                ext = ".gif"
+            elif image_data[:4] == b'RIFF' and image_data[8:12] == b'WEBP':
+                ext = ".webp"
+            else:
+                ext = ".png"  # Default to PNG
+            
+            # Generate unique filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            hash_suffix = hashlib.md5(image_data[:1024]).hexdigest()[:8]
+            filename = f"image_{timestamp}_{hash_suffix}{ext}"
+        
+        # Ensure filename has extension
+        if not any(filename.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp']):
+            filename += ".png"
+        
+        # Sanitize filename
+        filename = re.sub(r'[^\w\-_\.]', '_', filename)
+        
+        # Create static/images directory if it doesn't exist
+        folder = data.get("folder", "")
+        if folder:
+            folder = re.sub(r'[^\w\-_/]', '_', folder)  # Sanitize folder name
+            images_dir = Path("static/images") / folder
+        else:
+            images_dir = Path("static/images")
+        
+        images_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save the image
+        image_path = images_dir / filename
+        
+        # Handle filename conflicts
+        counter = 1
+        original_stem = image_path.stem
+        while image_path.exists():
+            image_path = images_dir / f"{original_stem}_{counter}{image_path.suffix}"
+            counter += 1
+        
+        with open(image_path, 'wb') as f:
+            f.write(image_data)
+        
+        # Generate web URL
+        if folder:
+            web_url = f"/static/images/{folder}/{image_path.name}"
+        else:
+            web_url = f"/static/images/{image_path.name}"
+        
+        logger.info(f"Image uploaded: {image_path} by user {current_user.email}")
+        
+        return {
+            "success": True,
+            "url": web_url,
+            "path": str(image_path.absolute()),
+            "filename": image_path.name,
+            "size_bytes": len(image_data),
+            "message": f"Image uploaded successfully: {web_url}"
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading image: {e}")
+        raise HTTPException(status_code=500, detail=f"Image upload failed: {str(e)}")
+
 # Article API Routes
 @app.get("/api/articles")
 async def get_articles(

@@ -625,6 +625,28 @@ class PromptHousePremiumServer {
               },
               required: ['type']
             }
+          },
+          {
+            name: 'upload_image',
+            description: 'Upload an image to the server for use in articles. Returns a web-accessible URL.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                base64: {
+                  type: 'string',
+                  description: 'Base64-encoded image data. Can include data URL prefix (e.g., "data:image/png;base64,...") or just the base64 string.'
+                },
+                filename: {
+                  type: 'string',
+                  description: 'Desired filename for the image (optional). If not provided, a unique filename will be generated.'
+                },
+                folder: {
+                  type: 'string',
+                  description: 'Subfolder within static/images to store the image (optional). Useful for organizing images by article or category.'
+                }
+              },
+              required: ['base64']
+            }
           }
         ]
       };
@@ -685,6 +707,9 @@ class PromptHousePremiumServer {
           
           case 'import_articles':
             return await this.handleImportArticles(args);
+          
+          case 'upload_image':
+            return await this.handleUploadImage(args);
           
           default:
             throw new Error(`Unknown tool: ${name}`);
@@ -1282,6 +1307,46 @@ class PromptHousePremiumServer {
           {
             type: 'text',
             text: `❌ Article import failed: ${error.response?.data?.detail || error.message}`
+          }
+        ]
+      };
+    }
+  }
+
+  private async handleUploadImage(args: any) {
+    try {
+      if (!args.base64) {
+        throw new Error('base64 image data is required');
+      }
+
+      const uploadData: any = {
+        base64: args.base64
+      };
+
+      if (args.filename) {
+        uploadData.filename = args.filename;
+      }
+
+      if (args.folder) {
+        uploadData.folder = args.folder;
+      }
+
+      const data = await this.makeApiCall('/mcp/upload-image', 'POST', uploadData);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `✅ **Image Uploaded Successfully!**\n\n🖼️ **Image Details:**\n• URL: ${data.url}\n• Filename: ${data.filename}\n• Size: ${(data.size_bytes / 1024).toFixed(2)} KB\n\n**Usage in Markdown:**\n\`\`\`markdown\n![Image Description](${data.url})\n\`\`\`\n\n**Usage in Article Metadata:**\n\`\`\`json\n{\n  "image_url": "${data.url}"\n}\n\`\`\`\n\n---\n\n**Raw Data:**\n${JSON.stringify(data, null, 2)}`
+          }
+        ]
+      };
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ Image upload failed: ${error.response?.data?.detail || error.message}`
           }
         ]
       };
