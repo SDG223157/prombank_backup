@@ -2,7 +2,6 @@ import os
 import time
 import logging
 from sqlalchemy import create_engine, text, Column, String, DateTime, Boolean, Integer, Text, JSON, func
-from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import OperationalError
@@ -10,17 +9,44 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# Database configuration
+# Prevent libpq from reading stale SSL client certs (Neon/Coolify fix)
+os.environ["PGSSLCERT"] = "/tmp/.postgresql/nonexistent.crt"
+os.environ["PGSSLKEY"] = "/tmp/.postgresql/nonexistent.key"
+
+# Database configuration - supports both PostgreSQL (Neon) and MySQL
 DATABASE_URL = os.getenv('DATABASE_URL', 'mysql+pymysql://mysql:password@localhost:3306/default')
 
+# Strip channel_binding param if using PostgreSQL (not supported by psycopg2)
+if "postgresql" in DATABASE_URL:
+    from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+    _parsed = urlparse(DATABASE_URL)
+    _params = parse_qs(_parsed.query)
+    _params.pop("channel_binding", None)
+    _params.setdefault("sslmode", ["require"])
+    _cleaned_query = urlencode(_params, doseq=True)
+    DATABASE_URL = urlunparse(_parsed._replace(query=_cleaned_query))
+
+# Build engine kwargs based on DB type
+_engine_kwargs = {
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
+    "pool_size": 10,
+    "max_overflow": 20,
+    "pool_timeout": 30,
+    "echo": False,
+}
+if "mysql" in DATABASE_URL:
+    _engine_kwargs["connect_args"] = {"charset": "utf8mb4"}
+
 # Create SQLAlchemy engine
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_recycle=300,
-    echo=False,
-    connect_args={"charset": "utf8mb4"}
-)
+engine = create_engine(DATABASE_URL, **_engine_kwargs)
+
+# LONGTEXT compat: use Text variant for MySQL, plain Text for Postgres
+try:
+    from sqlalchemy.dialects.mysql import LONGTEXT
+    LargeText = Text().with_variant(LONGTEXT(), "mysql")
+except ImportError:
+    LargeText = Text()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -48,9 +74,8 @@ class Prompt(Base):
     
     id = Column(String(255), primary_key=True)
     title = Column(String(500), nullable=False)
-    # MySQL TEXT is ~64KB; templates can exceed this. Use LONGTEXT on MySQL, plain TEXT elsewhere.
-    description = Column(Text().with_variant(LONGTEXT(), "mysql"), nullable=True)
-    content = Column(Text().with_variant(LONGTEXT(), "mysql"), nullable=False)
+    description = Column(LargeText, nullable=True)
+    content = Column(LargeText, nullable=False)
     tags = Column(JSON, default=list)
     is_public = Column(Boolean, default=False)
     category = Column(String(255), nullable=True)
@@ -87,8 +112,7 @@ class Article(Base):
     
     id = Column(String(255), primary_key=True)
     title = Column(String(500), nullable=False)
-    # MySQL TEXT is ~64KB; long markdown articles can exceed this. Use LONGTEXT on MySQL, plain TEXT elsewhere.
-    content = Column(Text().with_variant(LONGTEXT(), "mysql"), nullable=False)
+    content = Column(LargeText, nullable=False)
     category = Column(String(255), nullable=True)
     tags = Column(JSON, default=list)
     prompt_id = Column(String(255), nullable=True)  # Optional reference to source prompt
@@ -105,9 +129,9 @@ class Skill(Base):
     
     id = Column(String(255), primary_key=True)
     title = Column(String(500), nullable=False)
-    description = Column(Text().with_variant(LONGTEXT(), "mysql"), nullable=True)
+    description = Column(LargeText, nullable=True)
     # Main SKILL.md content
-    content = Column(Text().with_variant(LONGTEXT(), "mysql"), nullable=False)
+    content = Column(LargeText, nullable=False)
     # Additional files stored as JSON: [{"filename": "reference.md", "content": "..."}, ...]
     files = Column(JSON, default=list)
     category = Column(String(255), nullable=True)

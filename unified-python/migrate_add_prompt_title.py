@@ -22,28 +22,20 @@ def migrate_add_prompt_title():
         # Get database connection
         db = next(get_db())
         
-        # Check if column already exists
-        try:
-            result = db.execute(text("""
-                SELECT COLUMN_NAME 
-                FROM INFORMATION_SCHEMA.COLUMNS 
-                WHERE TABLE_NAME = 'articles' 
-                AND COLUMN_NAME = 'prompt_title'
-            """)).fetchone()
-            
-            if result:
-                logger.info("✅ prompt_title column already exists")
-                return {"success": True, "message": "Column already exists", "already_migrated": True}
-        except Exception as e:
-            logger.info(f"Column check failed, proceeding with migration: {e}")
+        # Check if column already exists (cross-database compatible)
+        from sqlalchemy import inspect as sa_inspect
+        from database import engine
+        inspector = sa_inspect(engine)
+        columns = [c["name"] for c in inspector.get_columns("articles")]
+        if "prompt_title" in columns:
+            logger.info("✅ prompt_title column already exists")
+            return {"success": True, "message": "Column already exists", "already_migrated": True}
         
         # Add the prompt_title column
         logger.info("📝 Adding prompt_title column to articles table...")
-        db.execute(text("""
-            ALTER TABLE articles 
-            ADD COLUMN prompt_title VARCHAR(500) NULL 
-            COMMENT 'Title of the source prompt for easy identification'
-        """))
+        db.execute(text(
+            "ALTER TABLE articles ADD COLUMN prompt_title VARCHAR(500) NULL"
+        ))
         
         logger.info("✅ Column added successfully")
         

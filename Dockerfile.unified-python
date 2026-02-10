@@ -5,9 +5,15 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     dumb-init \
-    default-mysql-client \
+    libpq-dev \
+    ca-certificates \
+    gcc \
     netcat-traditional \
     && rm -rf /var/lib/apt/lists/*
+
+# Prevent libpq from reading stale SSL client certs
+ENV PGSSLCERT=/tmp/.postgresql/nonexistent.crt
+ENV PGSSLKEY=/tmp/.postgresql/nonexistent.key
 
 # Set working directory
 WORKDIR /app
