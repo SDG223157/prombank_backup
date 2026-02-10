@@ -102,42 +102,51 @@ def migrate():
             if not rows:
                 continue
 
-            # Insert into Neon
+            # Clear existing data in Neon table first
             with new_engine.begin() as new_conn:
-                # Clear existing data in Neon table first
                 new_conn.execute(text(f'DELETE FROM "{table}"'))
 
-                for i, row in enumerate(rows):
-                    row_dict = {}
-                    for col_idx, col_name in enumerate(columns):
-                        val = row[col_idx]
-                        # Handle bytes
-                        if isinstance(val, bytes):
-                            val = val.decode('utf-8', errors='replace')
-                        # Serialize dict/list to JSON string for psycopg2
-                        if isinstance(val, (dict, list)):
-                            val = json.dumps(val, default=str)
-                        # Handle JSON string from MySQL - parse then re-dump
-                        if isinstance(val, str) and val.startswith(('[', '{')):
-                            try:
-                                parsed = json.loads(val)
-                                val = json.dumps(parsed, default=str)
-                            except (json.JSONDecodeError, TypeError):
-                                pass
-                        row_dict[col_name] = val
+            # Insert rows one by one (each in own transaction)
+            success_count = 0
+            fail_count = 0
+            for i, row in enumerate(rows):
+                row_dict = {}
+                for col_idx, col_name in enumerate(columns):
+                    val = row[col_idx]
+                    # Handle bytes
+                    if isinstance(val, bytes):
+                        val = val.decode('utf-8', errors='replace')
+                    # MySQL booleans (tinyint 0/1) → Python bool for Postgres
+                    if isinstance(val, int) and col_name in (
+                        'is_active', 'is_public', 'is_admin', 'is_email_verified'
+                    ):
+                        val = bool(val)
+                    # Serialize dict/list to JSON string for psycopg2
+                    if isinstance(val, (dict, list)):
+                        val = json.dumps(val, default=str)
+                    # Handle JSON string from MySQL - parse then re-dump
+                    elif isinstance(val, str) and val.startswith(('[', '{')):
+                        try:
+                            parsed = json.loads(val)
+                            val = json.dumps(parsed, default=str)
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                    row_dict[col_name] = val
 
-                    # Build INSERT
-                    col_names = ', '.join(f'"{c}"' for c in row_dict.keys())
-                    placeholders = ', '.join(f':{c}' for c in row_dict.keys())
-                    sql = f'INSERT INTO "{table}" ({col_names}) VALUES ({placeholders})'
+                # Build INSERT
+                col_names = ', '.join(f'"{c}"' for c in row_dict.keys())
+                placeholders = ', '.join(f':{c}' for c in row_dict.keys())
+                sql = f'INSERT INTO "{table}" ({col_names}) VALUES ({placeholders})'
 
-                    try:
+                try:
+                    with new_engine.begin() as new_conn:
                         new_conn.execute(text(sql), row_dict)
-                    except Exception as e:
-                        logger.warning(f"  ⚠️  Row {i} in {table} failed: {e}")
-                        continue
+                    success_count += 1
+                except Exception as e:
+                    fail_count += 1
+                    logger.warning(f"  ⚠️  Row {i} in {table} failed: {e}")
 
-                logger.info(f"✅ {table}: {len(rows)} rows migrated!")
+            logger.info(f"✅ {table}: {success_count} migrated, {fail_count} failed")
 
     logger.info("🎉 Migration completed!")
 
