@@ -111,15 +111,19 @@ def migrate():
                     row_dict = {}
                     for col_idx, col_name in enumerate(columns):
                         val = row[col_idx]
-                        # Handle JSON columns: MySQL might return strings
-                        if isinstance(val, str) and val.startswith(('[', '{')):
-                            try:
-                                val = json.loads(val)
-                            except (json.JSONDecodeError, TypeError):
-                                pass
                         # Handle bytes
                         if isinstance(val, bytes):
                             val = val.decode('utf-8', errors='replace')
+                        # Serialize dict/list to JSON string for psycopg2
+                        if isinstance(val, (dict, list)):
+                            val = json.dumps(val, default=str)
+                        # Handle JSON string from MySQL - parse then re-dump
+                        if isinstance(val, str) and val.startswith(('[', '{')):
+                            try:
+                                parsed = json.loads(val)
+                                val = json.dumps(parsed, default=str)
+                            except (json.JSONDecodeError, TypeError):
+                                pass
                         row_dict[col_name] = val
 
                     # Build INSERT
